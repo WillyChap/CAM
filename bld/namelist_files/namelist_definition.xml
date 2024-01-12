@@ -52,8 +52,9 @@
      valid_values
           This is an optional attribute that is mainly useful for variables
           that have only a small number of allowed values.
-                                                                        -->
-
+     
+                                                                   -->
+    
 <!-- Nudging Parameters -->
 
 <entry id="Nudge_Model" type="logical" category="nudging"
@@ -65,41 +66,41 @@
         Nudging tendencies are applied as a relaxation force between the current
         model state values and target state values derived from the avalilable
         analyses. The form of the target values is selected by the 'Nudge_Force_Opt'
-        option, the timescale of the forcing is determined from the given 
-        'Nudge_TimeScale_Opt', and the nudging strength Alpha=[0.,1.] for each 
+        option, the timescale of the forcing is determined from the given
+        'Nudge_TimeScale_Opt', and the nudging strength Alpha=[0.,1.] for each
         variable is specified by the 'Nudge_Xcoef' values. Where X={U,V,T,Q,PS}
- 
+
                F_nudge = Alpha*((Target-Model(t_curr))/TimeScale
- 
+
         WINDOWING:
         ----------
-        The region of applied nudging can be limited using Horizontal/Vertical 
-        window functions that are constructed using a parameterization of the 
-        Heaviside step function. 
-    
-        The Heaviside window function is the product of separate horizonal and vertical 
+        The region of applied nudging can be limited using Horizontal/Vertical
+        window functions that are constructed using a parameterization of the
+        Heaviside step function.
+
+        The Heaviside window function is the product of separate horizonal and vertical
         windows that are controled via 12 parameters:
-    
-            Nudge_Hwin_lat0:     Specify the horizontal center of the window in degrees. 
-            Nudge_Hwin_lon0:     The longitude must be in the range [0,360] and the 
+
+            Nudge_Hwin_lat0:     Specify the horizontal center of the window in degrees.
+            Nudge_Hwin_lon0:     The longitude must be in the range [0,360] and the
                                  latitude should be [-90,+90].
-            Nudge_Hwin_latWidth: Specify the lat and lon widths of the window as positive 
-            Nudge_Hwin_lonWidth: values in degrees.Setting a width to a large value (e.g. 999) 
+            Nudge_Hwin_latWidth: Specify the lat and lon widths of the window as positive
+            Nudge_Hwin_lonWidth: values in degrees.Setting a width to a large value (e.g. 999)
                                  renders the window a constant in that direction.
-            Nudge_Hwin_latDelta: Controls the sharpness of the window transition with a 
-            Nudge_Hwin_lonDelta: length in degrees. Small non-zero values yeild a step 
+            Nudge_Hwin_latDelta: Controls the sharpness of the window transition with a
+            Nudge_Hwin_lonDelta: length in degrees. Small non-zero values yeild a step
                                  function while a large value yeilds a smoother transition.
-            Nudge_Hwin_Invert  : A logical flag used to invert the horizontal window function 
+            Nudge_Hwin_Invert  : A logical flag used to invert the horizontal window function
                                  to get its compliment.(e.g. to nudge outside a given window).
-    
-            Nudge_Vwin_Lindex:   In the vertical, the window is specified in terms of model 
-            Nudge_Vwin_Ldelta:   level indcies. The High and Low transition levels should 
-            Nudge_Vwin_Hindex:   range from [0,(NLEV+1)]. The transition lengths are also 
-            Nudge_Vwin_Hdelta:   specified in terms of model indices. For a window function 
+
+            Nudge_Vwin_Lindex:   In the vertical, the window is specified in terms of model
+            Nudge_Vwin_Ldelta:   level indcies. The High and Low transition levels should
+            Nudge_Vwin_Hindex:   range from [0,(NLEV+1)]. The transition lengths are also
+            Nudge_Vwin_Hdelta:   specified in terms of model indices. For a window function
                                  constant in the vertical, the Low index should be set to 0,
-                                 the High index should be set to (NLEV+1), and the transition 
-                                 lengths should be set to 0.001 
-            Nudge_Vwin_Invert  : A logical flag used to invert the vertical window function 
+                                 the High index should be set to (NLEV+1), and the transition
+                                 lengths should be set to 0.001
+            Nudge_Vwin_Invert  : A logical flag used to invert the vertical window function
                                  to get its compliment.
        Default: FALSE
        </entry>
@@ -171,7 +172,7 @@
 <entry id="Nudge_Force_Opt" type="integer" category="nudging"
        group="nudging_nl" valid_values="" >
        Select the form of nudging forcing, where (t'==Analysis times ; t==Model Times)
-         0 -> NEXT-OBS: Target=Anal(t'_next)                 
+         0 -> NEXT-OBS: Target=Anal(t'_next)
          1 -> LINEAR:   Target=(F*Anal(t'_curr) +(1-F)*Anal(t'_next))
                             F =(t'_next - t_curr )/Tdlt_Anal
        Default: 0
@@ -179,8 +180,8 @@
 
 <entry id="Nudge_TimeScale_Opt" type="integer" category="nudging"
        group="nudging_nl" valid_values="" >
-       Select the timescale of nudging force, where (t'==Analysis times ; t==Model Times) 
-         0 -->  TimeScale = 1/Tdlt_Anal                     
+       Select the timescale of nudging force, where (t'==Analysis times ; t==Model Times)
+         0 -->  TimeScale = 1/Tdlt_Anal
          1 -->  TimeScale = 1/(t'_next - t_curr )
        Default: 0
        </entry>
@@ -344,6 +345,618 @@
          FALSE = value=1 inside the specified window, 0 outside
        Default: FALSE
        </entry>
+
+
+
+<!-- Stochaiing Parameters -->
+<entry id="Stochai_Model" type="logical" category="stochaiing"
+       group="stochaiing_nl" valid_values="" >
+       Toggle Model Stochaiing ON/OFF.
+
+        FORCING:
+        --------
+        Stochaiing tendencies are applied as a relaxation force between the current
+        model state values and target state values derived from the avalilable
+        analyses. The form of the target values is selected by the 'Stochai_Force_Opt'
+        option, the timescale of the forcing is determined from the given
+        'Stochai_TimeScale_Opt', and the stochaiing strength Alpha=[0.,1.] for each
+        variable is specified by the 'Stochai_Xcoef' values. Where X={U,V,T,Q,PS}
+
+               F_stochai = Alpha*((Target-Model(t_curr))/TimeScale
+
+        WINDOWING:
+        ----------
+        The region of applied stochaiing can be limited using Horizontal/Vertical
+        window functions that are constructed using a parameterization of the
+        Heaviside step function.
+
+        The Heaviside window function is the product of separate horizonal and vertical
+        windows that are controled via 12 parameters:
+
+            Stochai_Hwin_lat0:     Specify the horizontal center of the window in degrees.
+            Stochai_Hwin_lon0:     The longitude must be in the range [0,360] and the
+                                 latitude should be [-90,+90].
+            Stochai_Hwin_latWidth: Specify the lat and lon widths of the window as positive
+            Stochai_Hwin_lonWidth: values in degrees.Setting a width to a large value (e.g. 999)
+                                 renders the window a constant in that direction.
+            Stochai_Hwin_latDelta: Controls the sharpness of the window transition with a
+            Stochai_Hwin_lonDelta: length in degrees. Small non-zero values yeild a step
+                                 function while a large value yeilds a smoother transition.
+            Stochai_Hwin_Invert  : A logical flag used to invert the horizontal window function
+                                 to get its compliment.(e.g. to stochai outside a given window).
+
+            Stochai_Vwin_Lindex:   In the vertical, the window is specified in terms of model
+            Stochai_Vwin_Ldelta:   level indcies. The High and Low transition levels should
+            Stochai_Vwin_Hindex:   range from [0,(NLEV+1)]. The transition lengths are also
+            Stochai_Vwin_Hdelta:   specified in terms of model indices. For a window function
+                                 constant in the vertical, the Low index should be set to 0,
+                                 the High index should be set to (NLEV+1), and the transition
+                                 lengths should be set to 0.001
+            Stochai_Vwin_Invert  : A logical flag used to invert the vertical window function
+                                 to get its compliment.
+       Default: FALSE
+       </entry>
+
+<entry id="Stochai_Path" type="char*256" input_pathname="abs" category="stochaiing"
+       group="stochaiing_nl" valid_values="" >
+       Full pathname of analyses data to use for stochaiing.
+       (e.g. '/$DIN_LOC_ROOT/atm/cam/stochaiing/')
+       Default: none
+       </entry>
+
+
+<entry id="Stochai_File_Template" type="char*80" category="stochaiing"
+       group="stochaiing_nl" valid_values="" >
+       Template for Nudging analyses file names.
+       e.g. '%y/ERAI_ne30np4_L30.cam2.i.%y-%m-%d-%s.nc')
+       Default: none
+       </entry>
+
+<entry id="Stochai_Times_Per_Day" type="integer" category="stochaiing"
+      group="stochaiing_nl" valid_values="" >
+      Number of analyses files per day.
+      (e.g. 4 --> 6 hourly analyses)
+      Default: none
+      </entry>
+
+<entry id="Model_Times_Per_Day_Stochai" type="integer" category="stochaiing"
+      group="stochaiing_nl" valid_values="" >
+      Number of time to update model data per day.
+      (e.g. 48 --> 1800 Second timestep)
+      Default: none
+      </entry>
+
+<entry id="Stochai_Beg_Year" type="integer" category="stochaiing"
+      group="stochaiing_nl" valid_values="" >
+      Year at which Stochaiing Begins.
+      Default: none
+      </entry>
+
+<entry id="Stochai_Beg_Month" type="integer" category="stochaiing"
+        group="stochaiing_nl" valid_values="" >
+        Month at which Stochaiing Begins.
+        Default: none
+        </entry>
+
+<entry id="Stochai_Beg_Day" type="integer" category="stochaiing"
+        group="stochaiing_nl" valid_values="" >
+        Day at which Stochaiing Begins.
+        Default: none
+        </entry>
+
+<entry id="Stochai_End_Year" type="integer" category="stochaiing"
+        group="stochaiing_nl" valid_values="" >
+        Year at which Stochaiing Ends.
+        Default: none
+        </entry>
+
+<entry id="Stochai_End_Month" type="integer" category="stochaiing"
+        group="stochaiing_nl" valid_values="" >
+        Month at which Stochaiing Ends.
+        Default: none
+        </entry>
+
+<entry id="Stochai_End_Day" type="integer" category="stochaiing"
+        group="stochaiing_nl" valid_values="" >
+        Day at which Stochaiing Ends.
+        Default: none
+        </entry>
+
+<entry id="Stochai_Force_Opt" type="integer" category="stochaiing"
+        group="stochaiing_nl" valid_values="" >
+        Select the form of stochaiing forcing, where (t'==Analysis times ; t==Model Times)
+         0 -> NEXT-OBS: Target=Anal(t'_next)
+         1 -> LINEAR:   Target=(F*Anal(t'_curr) +(1-F)*Anal(t'_next))
+                                  F =(t'_next - t_curr )/Tdlt_Anal
+        Default: 0
+        </entry>
+
+<entry id="Stochai_TimeScale_Opt" type="integer" category="stochaiing"
+        group="stochaiing_nl" valid_values="" >
+        Select the timescale of stochaiing force, where (t'==Analysis times ; t==Model Times)
+         0 -->  TimeScale = 1/Tdlt_Anal
+         1 -->  TimeScale = 1/(t'_next - t_curr )
+        Default: 0
+        </entry>
+
+<entry id="Stochai_Uprof" type="integer" category="stochaiing"
+        group="stochaiing_nl" valid_values="" >
+        Profile index for U stochaiing.
+         0 == OFF      (No Stochaiing of this variable)
+         1 == CONSTANT (Spatially Uniform Stochaiing)
+         2 == HEAVISIDE WINDOW FUNCTION
+        Default: 0
+        </entry>
+
+<entry id="Stochai_Ucoef" type="real" category="stochaiing"
+        group="stochaiing_nl" valid_values="" >
+        Normalized Coeffcient for U stochaiing.
+         [0.,1.] fraction of stochaiing tendency applied.
+        Default: 0.
+        </entry>
+
+<entry id="Stochai_Vprof" type="integer" category="stochaiing"
+        group="stochaiing_nl" valid_values="" >
+        Profile index for V stochaiing.
+         0 == OFF      (No Stochaiing of this variable)
+         1 == CONSTANT (Spatially Uniform Stochaiing)
+         2 == HEAVISIDE WINDOW FUNCTION
+       Default: 0
+        </entry>
+
+<entry id="Stochai_Vcoef" type="real" category="stochaiing"
+        group="stochaiing_nl" valid_values="" >
+        Normalized Coeffcient for V stochaiing.
+         [0.,1.] fraction of stochaiing tendency applied.
+        Default: 0.
+        </entry>
+
+<entry id="Stochai_Tprof" type="integer" category="stochaiing"
+        group="stochaiing_nl" valid_values="" >
+        Profile index for T stochaiing.
+         0 == OFF      (No Stochaiing of this variable)
+         1 == CONSTANT (Spatially Uniform Stochaiing)
+         2 == HEAVISIDE WINDOW FUNCTION
+        Default: 0
+        </entry>
+
+<entry id="Stochai_Tcoef" type="real" category="stochaiing"
+        group="stochaiing_nl" valid_values="" >
+        Normalized Coeffcient for T stochaiing.
+         [0.,1.] fraction of stochaiing tendency applied.
+        Default: 0.
+        </entry>
+
+<entry id="Stochai_Qprof" type="integer" category="stochaiing"
+        group="stochaiing_nl" valid_values="" >
+        Profile index for Q stochaiing.
+         0 == OFF      (No Stochaiing of this variable)
+         1 == CONSTANT (Spatially Uniform Stochaiing)
+         2 == HEAVISIDE WINDOW FUNCTION
+        Default: 0
+        </entry>
+
+<entry id="Stochai_Qcoef" type="real" category="stochaiing"
+        group="stochaiing_nl" valid_values="" >
+        Normalized Coeffcient for Q stochaiing.
+         [0.,1.] fraction of stochaiing tendency applied.
+        Default: 0.
+        </entry>
+
+<entry id="Stochai_PSprof" type="integer" category="stochaiing"
+        group="stochaiing_nl" valid_values="" >
+        Profile index for PS stochaiing.
+         0 == OFF      (No Stochaiing of this variable)
+         1 == CONSTANT (Spatially Uniform Stochaiing)
+         2 == HEAVISIDE WINDOW FUNCTION
+        Default: 0
+        </entry>
+
+<entry id="Stochai_PScoef" type="real" category="stochaiing"
+        group="stochaiing_nl" valid_values="" >
+        Normalized Coeffcient for PS stochaiing.
+         [0.,1.] fraction of stochaiing tendency applied.
+        Default: 0.
+        </entry>
+
+<entry id="Stochai_Hwin_lat0" type="real" category="stochaiing"
+        group="stochaiing_nl" valid_values="" >
+        LAT0 center of Horizontal Window in degrees [-90.,90.].
+        Default: none
+        </entry>
+
+<entry id="Stochai_Hwin_latWidth" type="real" category="stochaiing"
+        group="stochaiing_nl" valid_values="" >
+        Width of LAT Window in degrees.
+        Default: none
+        </entry>
+
+<entry id="Stochai_Hwin_latDelta" type="real" category="stochaiing"
+        group="stochaiing_nl" valid_values="" >
+        Width of transition which controls the steepness of window transition in latitude.
+        0. --> Step function
+        Default: none
+        </entry>
+
+<entry id="Stochai_Hwin_lon0" type="real" category="stochaiing"
+        group="stochaiing_nl" valid_values="" >
+        LON0 center of Horizontal Window in degrees [0.,360.].
+        Default: none
+        </entry>
+
+<entry id="Stochai_Hwin_lonWidth" type="real" category="stochaiing"
+        group="stochaiing_nl" valid_values="" >
+        Width of LON Window in degrees.
+        Default: none
+        </entry>
+
+<entry id="Stochai_Hwin_lonDelta" type="real" category="stochaiing"
+        group="stochaiing_nl" valid_values="" >
+        Width of transition which controls the steepness of window transition in longitude.
+        0. --> Step function
+        Default: none
+        </entry>
+
+<entry id="Stochai_Hwin_Invert" type="logical" category="stochaiing"
+        group="stochaiing_nl" valid_values="" >
+        Invert Horizontal Window Function to its Compliment.
+         TRUE  = value=0 inside the specified window, 1 outside
+         FALSE = value=1 inside the specified window, 0 outside
+        Default: FALSE
+        </entry>
+
+<entry id="Stochai_Vwin_Hindex" type="real" category="stochaiing"
+        group="stochaiing_nl" valid_values="" >
+        HIGH Level Index for Verical Window specified in terms of model level indices.
+         (e.g. For a 30 level model, Stochai_Vwin_Hindex ~ 30 )
+        Default: none
+        </entry>
+
+<entry id="Stochai_Vwin_Hdelta" type="real" category="stochaiing"
+        group="stochaiing_nl" valid_values="" >
+        Width of transition for HIGH end of Vertical Window.
+        Default: none
+        </entry>
+
+<entry id="Stochai_Vwin_Lindex" type="real" category="stochaiing"
+        group="stochaiing_nl" valid_values="" >
+        LOW Level Index for Verical Window specified in terms of model level indices.
+         (e.g. Stochai_Vwin_Lindex ~ 0 )
+        Default: none
+        </entry>
+
+<entry id="Stochai_Vwin_Ldelta" type="real" category="stochaiing"
+        group="stochaiing_nl" valid_values="" >
+        Width of transition for LOW end of Vertical Window.
+        Default: none
+        </entry>
+
+<entry id="Stochai_Vwin_Invert" type="logical" category="stochaiing"
+        group="stochaiing_nl" valid_values="" >
+        Invert Vertical Window Function to its Compliment.
+         TRUE  = value=0 inside the specified window, 1 outside
+         FALSE = value=1 inside the specified window, 0 outside
+        Default: FALSE
+        </entry>
+    
+    
+<!-- DAMLining Parameters -->
+<entry id="DAMLin_Model" type="logical" category="damlining"
+       group="damlining_nl" valid_values="" >
+       Toggle Model DAMLining ON/OFF.
+
+        FORCING:
+        --------
+        DAMLining tendencies are applied as a relaxation force between the current
+        model state values and target state values derived from the avalilable
+        analyses. The form of the target values is selected by the 'DAMLin_Force_Opt'
+        option, the timescale of the forcing is determined from the given
+        'DAMLin_TimeScale_Opt', and the DAMLining strength Alpha=[0.,1.] for each
+        variable is specified by the 'DAMLin_Xcoef' values. Where X={U,V,T,Q,PS}
+
+               F_DAMLin = Alpha*((Target-Model(t_curr))/TimeScale
+
+        WINDOWING:
+        ----------
+        The region of applied DAMLining can be limited using Horizontal/Vertical
+        window functions that are constructed using a parameterization of the
+        Heaviside step function.
+
+        The Heaviside window function is the product of separate horizonal and vertical
+        windows that are controled via 12 parameters:
+
+            DAMLin_Hwin_lat0:     Specify the horizontal center of the window in degrees.
+            DAMLin_Hwin_lon0:     The longitude must be in the range [0,360] and the
+                                 latitude should be [-90,+90].
+            DAMLin_Hwin_latWidth: Specify the lat and lon widths of the window as positive
+            DAMLin_Hwin_lonWidth: values in degrees.Setting a width to a large value (e.g. 999)
+                                 renders the window a constant in that direction.
+            DAMLin_Hwin_latDelta: Controls the sharpness of the window transition with a
+            DAMLin_Hwin_lonDelta: length in degrees. Small non-zero values yeild a step
+                                 function while a large value yeilds a smoother transition.
+            DAMLin_Hwin_Invert  : A logical flag used to invert the horizontal window function
+                                 to get its compliment.(e.g. to DAMLin outside a given window).
+
+            DAMLin_Vwin_Lindex:   In the vertical, the window is specified in terms of model
+            DAMLin_Vwin_Ldelta:   level indcies. The High and Low transition levels should
+            DAMLin_Vwin_Hindex:   range from [0,(NLEV+1)]. The transition lengths are also
+            DAMLin_Vwin_Hdelta:   specified in terms of model indices. For a window function
+                                 constant in the vertical, the Low index should be set to 0,
+                                 the High index should be set to (NLEV+1), and the transition
+                                 lengths should be set to 0.001
+            DAMLin_Vwin_Invert  : A logical flag used to invert the vertical window function
+                                 to get its compliment.
+       Default: FALSE
+       </entry>
+    
+<entry id="DAMLin_Model_Regress" type="logical" category="damlining"
+       group="damlining_nl" valid_values="" >
+       Toggle Model DAMLining Regression ON/OFF.
+       Default: FALSE
+       </entry>
+
+<entry id="DAMLin_Path" type="char*256" input_pathname="abs" category="damlining"
+       group="damlining_nl" valid_values="" >
+       Full pathname of analyses data to use for DAMLining.
+       (e.g. '/$DIN_LOC_ROOT/atm/cam/DAMLining/')
+       Default: none
+       </entry>
+
+
+<entry id="DAMLin_File_Template" type="char*80" category="damlining"
+       group="damlining_nl" valid_values="" >
+       Template for Nudging analyses file names.
+       e.g. '%y/ERAI_ne30np4_L30.cam2.i.%y-%m-%d-%s.nc')
+       Default: none
+       </entry>
+
+<entry id="DAMLin_File_Anomaly" type="char*80" category="damlining"
+       group="damlining_nl" valid_values="" >
+       Template for Nudging analyses file names.
+       e.g. '%y/ERAI_ne30np4_L30.cam2.i.%y-%m-%d-%s.nc')
+       Default: none
+       </entry>
+
+<entry id="DAMLin_File_Diurnal" type="char*80" category="damlining"
+       group="damlining_nl" valid_values="" >
+       Template for Nudging analyses file names.
+       e.g. '%y/ERAI_ne30np4_L30.cam2.i.%y-%m-%d-%s.nc')
+       Default: none
+       </entry>
+
+<entry id="DAMLin_File_Norm" type="char*80" category="damlining"
+       group="damlining_nl" valid_values="" >
+       Template for Nudging analyses file names.
+       e.g. '%y/ERAI_ne30np4_L30.cam2.i.%y-%m-%d-%s.nc')
+       Default: none
+       </entry>
+
+<entry id="DAMLin_Times_Per_Day" type="integer" category="damlining"
+      group="damlining_nl" valid_values="" >
+      Number of analyses files per day.
+      (e.g. 4 --> 6 hourly analyses)
+      Default: none
+      </entry>
+
+<entry id="Model_Times_Per_Day_DAMLin" type="integer" category="damlining"
+      group="damlining_nl" valid_values="" >
+      Number of time to update model data per day.
+      (e.g. 48 --> 1800 Second timestep)
+      Default: none
+      </entry>
+
+<entry id="DAMLin_Beg_Year" type="integer" category="damlining"
+      group="damlining_nl" valid_values="" >
+      Year at which DAMLining Begins.
+      Default: none
+      </entry>
+
+<entry id="DAMLin_Beg_Month" type="integer" category="damlining"
+        group="damlining_nl" valid_values="" >
+        Month at which DAMLining Begins.
+        Default: none
+        </entry>
+
+<entry id="DAMLin_Beg_Day" type="integer" category="damlining"
+        group="damlining_nl" valid_values="" >
+        Day at which DAMLining Begins.
+        Default: none
+        </entry>
+
+<entry id="DAMLin_End_Year" type="integer" category="damlining"
+        group="damlining_nl" valid_values="" >
+        Year at which DAMLining Ends.
+        Default: none
+        </entry>
+
+<entry id="DAMLin_End_Month" type="integer" category="damlining"
+        group="damlining_nl" valid_values="" >
+        Month at which DAMLining Ends.
+        Default: none
+        </entry>
+
+<entry id="DAMLin_End_Day" type="integer" category="damlining"
+        group="damlining_nl" valid_values="" >
+        Day at which DAMLining Ends.
+        Default: none
+        </entry>
+
+<entry id="DAMLin_Force_Opt" type="integer" category="damlining"
+        group="damlining_nl" valid_values="" >
+        Select the form of DAMLining forcing, where (t'==Analysis times ; t==Model Times)
+         0 -> NEXT-OBS: Target=Anal(t'_next)
+         1 -> LINEAR:   Target=(F*Anal(t'_curr) +(1-F)*Anal(t'_next))
+                                  F =(t'_next - t_curr )/Tdlt_Anal
+        Default: 0
+        </entry>
+
+<entry id="DAMLin_TimeScale_Opt" type="integer" category="damlining"
+        group="damlining_nl" valid_values="" >
+        Select the timescale of DAMLining force, where (t'==Analysis times ; t==Model Times)
+         0 -->  TimeScale = 1/Tdlt_Anal
+         1 -->  TimeScale = 1/(t'_next - t_curr )
+        Default: 0
+        </entry>
+
+<entry id="DAMLin_Uprof" type="integer" category="damlining"
+        group="damlining_nl" valid_values="" >
+        Profile index for U DAMLining.
+         0 == OFF      (No DAMLining of this variable)
+         1 == CONSTANT (Spatially Uniform DAMLining)
+         2 == HEAVISIDE WINDOW FUNCTION
+        Default: 0
+        </entry>
+
+<entry id="DAMLin_Ucoef" type="real" category="damlining"
+        group="damlining_nl" valid_values="" >
+        Normalized Coeffcient for U DAMLining.
+         [0.,1.] fraction of DAMLining tendency applied.
+        Default: 0.
+        </entry>
+
+<entry id="DAMLin_Vprof" type="integer" category="damlining"
+        group="damlining_nl" valid_values="" >
+        Profile index for V DAMLining.
+         0 == OFF      (No DAMLining of this variable)
+         1 == CONSTANT (Spatially Uniform DAMLining)
+         2 == HEAVISIDE WINDOW FUNCTION
+       Default: 0
+        </entry>
+
+<entry id="DAMLin_Vcoef" type="real" category="damlining"
+        group="damlining_nl" valid_values="" >
+        Normalized Coeffcient for V DAMLining.
+         [0.,1.] fraction of DAMLining tendency applied.
+        Default: 0.
+        </entry>
+
+<entry id="DAMLin_Tprof" type="integer" category="damlining"
+        group="damlining_nl" valid_values="" >
+        Profile index for T DAMLining.
+         0 == OFF      (No DAMLining of this variable)
+         1 == CONSTANT (Spatially Uniform DAMLining)
+         2 == HEAVISIDE WINDOW FUNCTION
+        Default: 0
+        </entry>
+
+<entry id="DAMLin_Tcoef" type="real" category="damlining"
+        group="damlining_nl" valid_values="" >
+        Normalized Coeffcient for T DAMLining.
+         [0.,1.] fraction of DAMLining tendency applied.
+        Default: 0.
+        </entry>
+
+<entry id="DAMLin_Qprof" type="integer" category="damlining"
+        group="damlining_nl" valid_values="" >
+        Profile index for Q DAMLining.
+         0 == OFF      (No DAMLining of this variable)
+         1 == CONSTANT (Spatially Uniform DAMLining)
+         2 == HEAVISIDE WINDOW FUNCTION
+        Default: 0
+        </entry>
+
+<entry id="DAMLin_Qcoef" type="real" category="damlining"
+        group="damlining_nl" valid_values="" >
+        Normalized Coeffcient for Q DAMLining.
+         [0.,1.] fraction of DAMLining tendency applied.
+        Default: 0.
+        </entry>
+
+<entry id="DAMLin_PSprof" type="integer" category="damlining"
+        group="damlining_nl" valid_values="" >
+        Profile index for PS DAMLining.
+         0 == OFF      (No DAMLining of this variable)
+         1 == CONSTANT (Spatially Uniform DAMLining)
+         2 == HEAVISIDE WINDOW FUNCTION
+        Default: 0
+        </entry>
+
+<entry id="DAMLin_PScoef" type="real" category="damlining"
+        group="damlining_nl" valid_values="" >
+        Normalized Coeffcient for PS DAMLining.
+         [0.,1.] fraction of DAMLining tendency applied.
+        Default: 0.
+        </entry>
+
+<entry id="DAMLin_Hwin_lat0" type="real" category="damlining"
+        group="damlining_nl" valid_values="" >
+        LAT0 center of Horizontal Window in degrees [-90.,90.].
+        Default: none
+        </entry>
+
+<entry id="DAMLin_Hwin_latWidth" type="real" category="damlining"
+        group="damlining_nl" valid_values="" >
+        Width of LAT Window in degrees.
+        Default: none
+        </entry>
+
+<entry id="DAMLin_Hwin_latDelta" type="real" category="damlining"
+        group="damlining_nl" valid_values="" >
+        Width of transition which controls the steepness of window transition in latitude.
+        0. --> Step function
+        Default: none
+        </entry>
+
+<entry id="DAMLin_Hwin_lon0" type="real" category="damlining"
+        group="damlining_nl" valid_values="" >
+        LON0 center of Horizontal Window in degrees [0.,360.].
+        Default: none
+        </entry>
+
+<entry id="DAMLin_Hwin_lonWidth" type="real" category="damlining"
+        group="damlining_nl" valid_values="" >
+        Width of LON Window in degrees.
+        Default: none
+        </entry>
+
+<entry id="DAMLin_Hwin_lonDelta" type="real" category="damlining"
+        group="damlining_nl" valid_values="" >
+        Width of transition which controls the steepness of window transition in longitude.
+        0. --> Step function
+        Default: none
+        </entry>
+
+<entry id="DAMLin_Hwin_Invert" type="logical" category="damlining"
+        group="damlining_nl" valid_values="" >
+        Invert Horizontal Window Function to its Compliment.
+         TRUE  = value=0 inside the specified window, 1 outside
+         FALSE = value=1 inside the specified window, 0 outside
+        Default: FALSE
+        </entry>
+
+<entry id="DAMLin_Vwin_Hindex" type="real" category="damlining"
+        group="damlining_nl" valid_values="" >
+        HIGH Level Index for Verical Window specified in terms of model level indices.
+         (e.g. For a 30 level model, DAMLin_Vwin_Hindex ~ 30 )
+        Default: none
+        </entry>
+
+<entry id="DAMLin_Vwin_Hdelta" type="real" category="damlining"
+        group="damlining_nl" valid_values="" >
+        Width of transition for HIGH end of Vertical Window.
+        Default: none
+        </entry>
+
+<entry id="DAMLin_Vwin_Lindex" type="real" category="damlining"
+        group="damlining_nl" valid_values="" >
+        LOW Level Index for Verical Window specified in terms of model level indices.
+         (e.g. DAMLin_Vwin_Lindex ~ 0 )
+        Default: none
+        </entry>
+
+<entry id="DAMLin_Vwin_Ldelta" type="real" category="damlining"
+        group="damlining_nl" valid_values="" >
+        Width of transition for LOW end of Vertical Window.
+        Default: none
+        </entry>
+
+<entry id="DAMLin_Vwin_Invert" type="logical" category="damlining"
+        group="damlining_nl" valid_values="" >
+        Invert Vertical Window Function to its Compliment.
+         TRUE  = value=0 inside the specified window, 1 outside
+         FALSE = value=1 inside the specified window, 0 outside
+        Default: FALSE
+        </entry>
 
 
 <!-- Aerosols: Data (CAM version) -->
@@ -924,18 +1537,6 @@ Default: 60.
 Default: 50.
 </entry>
 
-<entry id="met_rlx_bot_top" type="real"  category="dyn_fv_off"
-       group="metdata_nl" valid_values="" >
-(km) top of ramping relaxation region for metdata at model bottom
-Default: 0.
-</entry>
-
-<entry id="met_rlx_bot_bot" type="real"  category="dyn_fv_off"
-       group="metdata_nl" valid_values="" >
-(km) bottom of ramping relaxation region for metdata at model bottom
-Default: 0.
-</entry>
-
 <entry id="met_rlx_time" type="real"  category="dyn_fv_off"
        group="metdata_nl" valid_values="" >
 Relaxation time (hours) applied to specified meteorology.
@@ -982,60 +1583,13 @@ Default: 1.0
 
 <entry id="met_srf_feedback" type="logical"  category="dyn_fv_off"
        group="metdata_nl" valid_values="" >
-If false then do not allow surface models feedbacks influence climate
+if false then do not allow surface models feedbacks influence climate
 Default: true
 </entry>
 
 <entry id="met_srf_nudge_flux" type="logical"  category="dyn_fv_off"
        group="metdata_nl" valid_values="" >
-If true nudge meteorology surface fields TAUX, TAUY, SHFLX, QFLX rather than force
-Default: true
-</entry>
-
-<entry id="met_srf_land" type="logical"  category="dyn_fv_off"
-       group="metdata_nl" valid_values="" >
-If true nudge meteorology surface fields over the land. If false, then fields are
-still nudged over the ocean.
-Default: true
-</entry>
-
-<entry id="met_srf_land_scale" type="logical"  category="dyn_fv_off"
-       group="metdata_nl" valid_values="" >
-If met_srf_land is false, then determines whether to nudge proportional to the non-land
-fraction (i.e. 1 - land fraction) (true), or to nudge everywhere except where land
-fraction is 1 (false).
-Default: false
-</entry>
-
-<entry id="met_srf_rad" type="logical"  category="dyn_fv_off"
-       group="metdata_nl" valid_values="" >
-If true nudge meteorology surface fields from radiation. These include ASDIR, ASDIF,
-ALDIR, ALDIF, and LWUP.
-Default: false
-</entry>
-
-<entry id="met_srf_refs" type="logical"  category="dyn_fv_off"
-       group="metdata_nl" valid_values="" >
-If true nudge meteorology reference surface fields. These include TSREF, QREF, and U10.
-Default: false
-</entry>
-
-<entry id="met_srf_sst" type="logical"  category="dyn_fv_off"
-       group="metdata_nl" valid_values="" >
-If true nudge meteorology reference for sea surface temperature and sea ice fraction
-(SST and SEAICEFRAC).
-Default: false
-</entry>
-
-<entry id="met_srf_tau" type="logical"  category="dyn_fv_off"
-       group="metdata_nl" valid_values="" >
-If true nudge surface sheer stress (TAUX, TAUY) from the meteorology.
-Default: true
-</entry>
-
-<entry id="met_nudge_temp" type="logical"  category="dyn_fv_off"
-       group="metdata_nl" valid_values="" >
-If true nudge atmospheric temperature (T) from the meteorology.
+if true nudge meteorology surface fields TAUX, TAUY, SHFLX, QFLX rather than force
 Default: true
 </entry>
 
@@ -1400,13 +1954,6 @@ mid-scale gravity waves from frontogenesis.
 Default: set by build-namelist.
 </entry>
 
-<entry id="gw_top_taper" type="logical" category="gw_drag"
-       group="gw_drag_nl" valid_values="" >
-Whether or not to apply tapering at the top of the model (above 0.6E-02 Pa)
-to reduce undesired effects of gravity waves in the thermosphere/ionosphere.
-Default: set by build-namelist
-</entry>
-
 <!-- Gravity Wave Ridge -->
 
 <entry id="gw_rdg_do_divstream" type="logical" category="gw_rdg"
@@ -1658,13 +2205,13 @@ Default: set by build-namelist
 
 <entry id="co2_readflux_fuel" type="logical"  category="co2_cycle"
        group="co2_cycle_nl" valid_values="" >
-If TRUE read co2 fuel flux from file.
+If TRUE read co2 flux from fuel.
 Default: set by build-namelist
 </entry>
 
 <entry id="co2_readflux_ocn" type="logical"  category="co2_cycle"
        group="co2_cycle_nl" valid_values="" >
-If TRUE read co2 ocn flux from file.
+If TRUE read co2 flux from ocn.
 Default: FALSE
 </entry>
 
@@ -3299,13 +3846,6 @@ Apply liquid supersaturation adjustment code
 Default: false
 </entry>
 
-<entry id="clubb_do_energyfix" type="logical"  category="conv"
-       group="clubb_params_nl" valid_values="" >
-Apply adjustments to dry static energy so that CLUBB conserves
-energy.
-Default: true
-</entry>
-
 <!-- CARMA Sectional Microphysics -->
 
 <entry id="carma_model" type="char*32" category="carma"
@@ -3904,9 +4444,10 @@ Default: set by build-namelist
 </entry>
 
 <entry id="cam_chempkg" type="char*32" category="build"
-       group="phys_ctl_nl" valid_values="trop_mam3,trop_mam4,trop_mam7,trop_mozart,trop_strat_mam4_vbs,trop_strat_mam4_vbsext,
-                                         waccm_ma,waccm_mad_mam4,waccm_ma_mam4,waccm_ma_sulfur,waccm_sc,waccm_sc_mam4,waccm_tsmlt_mam4,
-                                         terminator,none" >
+       group="phys_ctl_nl" valid_values="trop_mam3,trop_mam4,trop_mam7,trop_mozart,trop_strat_mam4_vbs,
+                                         trop_bam,trop_ghg,waccm_ma,waccm_mad_mam4,waccm_ma_mam4,
+                                         waccm_ma_sulfur,waccm_sc,waccm_sc_mam4,waccm_tsmlt,waccm_tsmlt_mam4,
+                                         waccm_tsmlt_sulfur,super_fast_llnl,super_fast_llnl_mam3,terminator,none" >
 Name of the CAM chemistry package.  N.B. this variable may not be set by
 the user.  It is set by build-namelist via information in the configure
 cache file to be consistent with how CAM was built.
@@ -3966,38 +4507,11 @@ Default: set by build-namelist
 Electric potential model used in the waccmx ionosphere.
 Default: set by build-namelist
 </entry>
-
-<entry id="ionos_epotential_amie" type="logical"  category="waccmx"
-       group="ionosphere_nl" valid_values="">
-Give the user the ability to input prescribed high-latitude electric potential.
-Default: FALSE
-</entry>
-
-<entry id="epot_crit_colats" type="real*2"  category="waccmx"
-       group="ionosphere_nl" valid_values="">
-Co-latitudes (degrees) of the critical angles where the ionosphere
-high-latitude electric potential is merged with the low and middle
-latitude electric potential computed by the electro-dynamo of WACCM-X.
-Default: none
-</entry>
-
 <entry id="wei05_coefs_file" type="char*256" input_pathname="abs" category="waccmx"
        group="ionosphere_nl" valid_values="" >
 Full pathname of dataset for coefficient data used in Weimer05
 high latitude electric potential model.
 Default: set by build-namelist.
-</entry>
-
-<entry id="amienh_file" type="char*256" input_pathname="abs" category="waccmx"
-       group="ionosphere_nl" valid_values="" >
-Full pathname of AMIE inputs for northern hemisphere.
-Default: NONE.
-</entry>
-
-<entry id="amiesh_file" type="char*256" input_pathname="abs" category="waccmx"
-       group="ionosphere_nl" valid_values="" >
-Full pathname of AMIE inputs for southern hemisphere.
-Default: NONE.
 </entry>
 
 <!-- Reference Pressures -->
@@ -4259,7 +4773,7 @@ than using instantaneous values.
 Default: FALSE
 </entry>
 
-<entry id="mode_defs" type="char*256(120)"  category="radiation"
+<entry id="mode_defs" type="char*256(60)"  category="radiation"
        group="rad_cnst_nl" valid_values="" >
 Definitions for the aerosol modes that may be used in the rad_climate and
 rad_diag_* variables.
@@ -4985,13 +5499,6 @@ Tuning parameter for dust emissions.
 Default: set by build-namelist.
 </entry>
 
-<entry id="steady_state_ion_elec_temp" type="logical" category="waccmx"
-       group="ion_electron_temp_nl" valid_values="" >
-If TRUE a steady state solution is used to calculate electron and
-ion temperature.
-Default: TRUE
-</entry>
-
 <entry id="efield_hflux_file" type="char*256" input_pathname="abs" category="waccm_phys"
        group="iondrag_nl" valid_values="" >
 Full pathname of dataset for coefficient data used in WACCM to calculate ion drag
@@ -5271,9 +5778,8 @@ Default: set by build-namelist.
 
 <entry id="aircraft_specifier" type="char*256(100)" category="cam_chem"
        group="aircraft_emit_nl" valid_values="" >
-Filename of file that contains aircraft input file lists. The filenames in the files are relative
-to the directory specified by {{ hilight }}aircraft_datapath{{ closehilight }}.
-Default: set by build-namelist.
+Full pathname of the aircraft input file list
+Default: none
 </entry>
 
 <entry id="aircraft_datapath" type="char*256" input_pathname="abs" category="cam_chem"
@@ -5284,7 +5790,7 @@ Default: set by build-namelist.
 </entry>
 
 <entry id="aircraft_type" type="char*32" category="cam_chem"
-       group="aircraft_emit_nl" valid_values="CYCLICAL_LIST,SERIAL" >
+       group="aircraft_emit_nl" valid_values="CYCLICAL_LIST" >
 Type of time interpolation for data in aircraft aerosol files.
 Default: 'CYCLICAL_LIST'
 </entry>
@@ -5296,7 +5802,6 @@ Full pathname of the ac_CO2 file specified in the filelist in
 get this name into the cam.input_data_list for the CESM scripts.
 Default: set by build-namelist.
 </entry>
-
 
 
 <entry id="gcr_ionization_datapath" type="char*256" input_pathname="abs" category="cam_chem"
@@ -6761,12 +7266,12 @@ Default: Set by build-namelist.
 
 <entry id="analytic_ic_type" type="char*80" category="dyn_test"
        group="analytic_ic_nl"
-       valid_values="none,held_suarez_1994,moist_baroclinic_wave_dcmip2016,dry_baroclinic_wave_dcmip2016,dry_baroclinic_wave_jw2006" >
-Specify the type of analytic initial conditions for an initial run.
-held_suarez_1994: Initial conditions specified in Held and Suarez (1994)
-moist_baroclinic_wave_dcmip2016: Moist baroclinic wave as used in the DCMIP 2016 experiments
-dry_baroclinic_wave_dcmip2016: Dry baroclinic wave as used in the DCMIP 2016 experiments
-dry_baroclinic_wave_jw2006: Dry baroclinic wave as specified in Jablonowski and Williamson (2006)
+       valid_values="none,held_suarez_1994,baroclinic_wave,dry_baroclinic_wave" >
+The analytic initial conditions to use for this run:
+none: Do not use analytic initial conditions (i.e., read IC from file)
+held_suarez_1994: Dynamics state will be set to Held-Suarez (1994) initial conditions.
+baroclinic_wave: Dynamics state will be set to a baroclinic wave initial condition.
+dry_baroclinic_wave: Dynamics state will be set to a dry baroclinic wave initial condition.
 Default: 'none'
 </entry>
 
@@ -7045,74 +7550,145 @@ Default:
 <!-- Task/Thread layouts -->
 
 <entry id="atm_pestride" type="integer"  category="driver"
-       group="cime_pes" valid_values="" >
+       group="ccsm_pes" valid_values="" >
 Stride used in selecting the processes in the atm communicator group.
 Default: 1
 </entry>
 
 <entry id="atm_rootpe" type="integer"  category="driver"
-       group="cime_pes" valid_values="" >
+       group="ccsm_pes" valid_values="" >
 Root process of the atm communicator group.
 Default: 0
 </entry>
 
 <entry id="atm_ntasks" type="integer"  category="driver"
-       group="cime_pes" valid_values="" >
+       group="ccsm_pes" valid_values="" >
 Number of atm tasks.
 Default: total number of tasks assigned to job.
 </entry>
 
 <entry id="atm_nthreads" type="integer"  category="driver"
-       group="cime_pes" valid_values="" >
+       group="ccsm_pes" valid_values="" >
 Number of threads in each atm task.
 Default: 1
 </entry>
 
+<entry id="lnd_pestride" type="integer"  category="driver"
+       group="ccsm_pes" valid_values="" >
+Stride used in selecting the processes in the lnd communicator group.
+Default: 1
+</entry>
+
+<entry id="lnd_rootpe" type="integer"  category="driver"
+       group="ccsm_pes" valid_values="" >
+Root process of the lnd communicator group.
+Default: 0
+</entry>
+
+<entry id="lnd_ntasks" type="integer"  category="driver"
+       group="ccsm_pes" valid_values="" >
+Number of lnd tasks.
+Default: total number of tasks assigned to job.
+</entry>
+
+<entry id="lnd_nthreads" type="integer"  category="driver"
+       group="ccsm_pes" valid_values="" >
+Number of threads in each lnd task.
+Default: 1
+</entry>
+
+<entry id="ice_pestride" type="integer"  category="driver"
+       group="ccsm_pes" valid_values="" >
+Stride used in selecting the processes in the ice communicator group.
+Default: 1
+</entry>
+
+<entry id="ice_rootpe" type="integer"  category="driver"
+       group="ccsm_pes" valid_values="" >
+Root process of the ice communicator group.
+Default: 0
+</entry>
+
+<entry id="ice_ntasks" type="integer"  category="driver"
+       group="ccsm_pes" valid_values="" >
+Number of ice tasks.
+Default: total number of tasks assigned to job.
+</entry>
+
+<entry id="ice_nthreads" type="integer"  category="driver"
+       group="ccsm_pes" valid_values="" >
+Number of threads in each ice task.
+Default: 1
+</entry>
 
 <entry id="ocn_pestride" type="integer"  category="driver"
-       group="cime_pes" valid_values="" >
+       group="ccsm_pes" valid_values="" >
 Stride used in selecting the processes in the ocn communicator group.
 Default: 1
 </entry>
 
 <entry id="ocn_rootpe" type="integer"  category="driver"
-       group="cime_pes" valid_values="" >
+       group="ccsm_pes" valid_values="" >
 Root process of the ocn communicator group.
 Default: 0
 </entry>
 
 <entry id="ocn_ntasks" type="integer"  category="driver"
-       group="cime_pes" valid_values="" >
+       group="ccsm_pes" valid_values="" >
 Number of ocn tasks.
 Default: total number of tasks assigned to job.
 </entry>
 
 <entry id="ocn_nthreads" type="integer"  category="driver"
-       group="cime_pes" valid_values="" >
+       group="ccsm_pes" valid_values="" >
 Number of threads in each ocn task.
 Default: 1
 </entry>
 
+<entry id="rof_pestride" type="integer"  category="driver"
+       group="ccsm_pes" valid_values="" >
+Stride used in selecting the processes in the rof communicator group.
+Default: 1
+</entry>
+
+<entry id="rof_rootpe" type="integer"  category="driver"
+       group="ccsm_pes" valid_values="" >
+Root process of the rof communicator group.
+Default: 0
+</entry>
+
+<entry id="rof_ntasks" type="integer"  category="driver"
+       group="ccsm_pes" valid_values="" >
+Number of rof tasks.
+Default: total number of tasks assigned to job.
+</entry>
+
+<entry id="rof_nthreads" type="integer"  category="driver"
+       group="ccsm_pes" valid_values="" >
+Number of threads in each rof task.
+Default: 1
+</entry>
+
 <entry id="cpl_pestride" type="integer"  category="driver"
-       group="cime_pes" valid_values="" >
+       group="ccsm_pes" valid_values="" >
 Stride used in selecting the processes in the cpl communicator group.
 Default: 1
 </entry>
 
 <entry id="cpl_rootpe" type="integer"  category="driver"
-       group="cime_pes" valid_values="" >
+       group="ccsm_pes" valid_values="" >
 Root process of the cpl communicator group.
 Default: 0
 </entry>
 
 <entry id="cpl_ntasks" type="integer"  category="driver"
-       group="cime_pes" valid_values="" >
+       group="ccsm_pes" valid_values="" >
 Number of cpl tasks.
 Default: total number of tasks assigned to job.
 </entry>
 
 <entry id="cpl_nthreads" type="integer"  category="driver"
-       group="cime_pes" valid_values="" >
+       group="ccsm_pes" valid_values="" >
 Number of threads in each cpl task.
 Default: 1
 </entry>
@@ -7582,7 +8158,7 @@ Default: 1
 </entry>
 
 <entry id="stop_option" type="char*8"  category="time_mgr"
-       group="seq_timemgr_inparm" valid_values="nsteps,nhours,ndays,nmonths,nyears,date" >
+       group="seq_timemgr_inparm" valid_values="nsteps,ndays,nmonths,nyears,date" >
 Set the length of run as an elapsed time using one of the options 'nsteps',
 'ndays', 'nmonths', or 'nyears', in conjuction
 with {{ hilight }}stop_n{{ closehilight }} to set the number of elapsed time units.
@@ -7615,6 +8191,68 @@ This varible is only used internally by build-namelist to determine
 appropriate defaults for climatological or transient forcing datasets.
 Default: set by build-namelist.
 </entry>
+
+
+<!-- ========================================================================================  -->
+<!-- Stochastic physics suite: -->
+<!-- ========================================================================================  -->
+<!-- Stochastically perturbed physics tendencies SPPT-->
+<entry id="cam_stoch_sppt" type="integer" category="cam_stoch"
+       group="cam_stoch_nl" valid_values="0,1" >
+Switch for stochastic parameter perturbations. Option at this point is
+0 = off, 1 = SPPT
+Default: set by build-namelist
+</entry>
+
+<entry id="cam_stoch_sppt_tau" type="real" category="cam_stoch"
+       group="cam_stoch_nl" valid_values="" >
+Temporal decorrelation time for stochastic pattern 
+</entry>
+
+<entry id="cam_stoch_sppt_sigma" type="real" category="cam_stoch"
+       group="cam_stoch_nl" valid_values="" >
+Gripoint standard deviation time for stochastic pattern 
+</entry>
+
+<entry id="cam_stoch_sppt_lengthscale" type="real" category="cam_stoch"
+       group="cam_stoch_nl" valid_values="" >
+Lengthscale for stochastic pattern
+</entry>
+
+<entry id="cam_stoch_sppt_cutoff" type="real" category="cam_stoch"
+       group="cam_stoch_nl" valid_values="" >
+Cutoff in sigma 
+</entry>
+
+<entry id="cam_stoch_sppt_seed" type="integer" category="cam_stoch"
+       group="cam_stoch_nl" valid_values="" >
+Seed for random number stream
+</entry>
+
+<!-- Stochastic kinetic energy backscatter -->
+
+<entry id="cam_stoch_skebs" type="integer" category="cam_stoch"
+       group="cam_stoch_nl" valid_values="0,1" >
+Switch for stochastic kinetic energy backscatter scheme. Option at this point is
+0 = off, 1 = SKEBS
+Default: set by build-namelist
+</entry>
+
+<entry id="cam_stoch_tot_backscat_psi" type="real" category="cam_stoch"
+       group="cam_stoch_nl" valid_values="" >
+Tuning parameter for streamfunction forcing in SKEBS
+</entry>
+
+<entry id="cam_stoch_tot_backscat_t" type="real" category="cam_stoch"
+       group="cam_stoch_nl" valid_values="" >
+Tuning parameter for temperature forcing in SKEBS
+</entry>
+
+<entry id="cam_stoch_skebs_seed" type="integer" category="cam_stoch"
+       group="cam_stoch_nl" valid_values="" >
+Seed for random number generator in cam_skebs_stoch
+</entry>
+
 
 <!-- ========================================================================================  -->
 <!-- physical constants: -->
