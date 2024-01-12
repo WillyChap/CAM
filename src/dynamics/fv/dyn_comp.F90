@@ -1072,7 +1072,7 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
    real(r8), allocatable :: uc_s(:,:,:),vc_s(:,:,:)  ! workspace (accumulated uc,vc)
    real(r8), allocatable :: uc_i(:,:,:),vc_i(:,:,:)  ! workspace (transposed uc_s,vc_s)
 
-
+   integer, save :: step_count = 1
    ! NOTE -- model behaviour with high_order_top=true is still under validation and may require
    !         some other form of enhanced damping in the top layer
    logical, parameter :: high_order_top=.false.
@@ -1110,6 +1110,7 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
    ns   = dyn_state%nsplit   ! large split (will be subdivided later)
    n2   = dyn_state%nspltrac ! tracer split(will be subdivided later)
    nv   = dyn_state%nspltvrm ! vertical re-mapping split
+
    icd  = dyn_state%icd
    jcd  = dyn_state%jcd
    iord = dyn_state%iord
@@ -1422,7 +1423,7 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
    nsplit = (ns+n2*nv-1) / (n2*nv)
    dt     = bdt / real(nsplit*n2*nv,r8)
 
-   if (print_subcycling) then
+   if (print_subcycling .or. (mod(step_count,48)==0)) then
       print_subcycling = .false.
       if (masterproc) then
          write(iulog,*) 'FV subcycling - nv, n2, nsplit, dt = ', nv, n2, nsplit, dt
@@ -2683,6 +2684,13 @@ subroutine dyn_run(ptop, ndt, te0, dyn_state, dyn_in, dyn_out, rc)
          enddo
       enddo
    end if
+   ! This will decrease large nsplit values to defaults over the first few days.
+   if(mod(step_count,48)==0) then
+      dyn_state%nsplit = max(16, dyn_state%nsplit/2)
+      dyn_state%nspltrac = max(4, dyn_state%nspltrac/2)
+      dyn_state%nspltvrm = max(4, dyn_state%nspltvrm/2)
+   endif
+   step_count = step_count+1
 
    call t_startf ('dyn_run_dealloc')
 
@@ -3129,7 +3137,7 @@ subroutine process_inidat(fh_ini, grid, dyn_in, fieldname, m_cnst)
 
          ! reset PIO to handle errors as before
          call pio_seterrorhandling(fh_ini, err_handling)
-        
+
 
       else if (.not. analytic_ic_active()) then
 

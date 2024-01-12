@@ -43,10 +43,10 @@ public ::&
    timemgr_datediff,         &! calculate difference between two time instants
    timemgr_time_ge,          &! check if time2 is later than or equal to time1
    timemgr_time_inc,         &! increment time instant by a given interval
+   timemgr_time_inc_minus,   &! +++WEC
    timemgr_set_date_time,    &! set the current date and time
    set_time_float_from_date, &! returns a float representation of time given  yr, mon, day, sec
-   set_date_from_time_float   ! returns yr, mon, day, sec given time float
-
+   set_date_from_time_float  ! returns yr, mon, day, sec given time float
 
 ! Private module data
 
@@ -1142,6 +1142,63 @@ subroutine timemgr_time_inc(ymd1, tod1, ymd2, tod2, inc_s, inc_h, inc_d)
 end subroutine timemgr_time_inc
 
 !=========================================================================================
+!++WEC
+subroutine timemgr_time_inc_minus(ymd1, tod1, ymd2, tod2, inc_s, inc_h, inc_d)
+
+! Increment the time instant (ymd1,tod1) by an interval and return the resulting
+! time instant (ymd2,tod2).
+
+   ! Arguments
+   integer, intent(in) ::&
+      ymd1,    &! date1 in yyyymmdd format
+      tod1      ! time of day relative to date1 (seconds past 0Z)
+
+   integer, intent(out) ::&
+      ymd2,    &! date2 in yyyymmdd format
+      tod2      ! time of day relative to date2 (seconds past 0Z)
+
+   integer, intent(in), optional ::&
+      inc_s,   &! number of seconds in interval
+      inc_h,   &! number of hours in interval
+      inc_d     ! number of days in interval
+
+   ! Local variables
+   character(len=*), parameter :: sub = 'timemgr_time_inc'
+   integer :: rc   ! return code
+
+   type(ESMF_Time) :: date1
+   type(ESMF_Time) :: date2
+   type(ESMF_TimeInterval) :: t_interval
+   integer :: year, month, day
+!-----------------------------------------------------------------------------------------
+
+   ! set esmf time object
+   date1 = TimeSetymd( ymd1, tod1, "date1" )
+
+   ! set esmf time interval object
+   if (present(inc_s)) then
+      call ESMF_TimeIntervalSet(t_interval, s=inc_s, rc=rc)
+   else if (present(inc_h)) then
+      call ESMF_TimeIntervalSet(t_interval, h=inc_h, rc=rc)
+   else if (present(inc_d)) then
+      call ESMF_TimeIntervalSet(t_interval, d=inc_d, rc=rc)
+   else
+      call endrun(sub//': one of the args inc_s, inc_h, or inc_d must be set')
+   end if
+   call chkrc(rc, sub//': error return from ESMF_TimeIntervalSet')
+
+   ! increment the time instant
+   date2 = date1 - t_interval
+
+   ! extract the time components
+   call ESMF_TimeGet(date2, yy=year, mm=month, dd=day, s=tod2, rc=rc)
+   call chkrc(rc, sub//': error return from ESMF_TimeGet')
+   ymd2 = year*10000 + month*100 + day
+
+end subroutine timemgr_time_inc_minus
+!--WEC
+!=========================================================================================
+
 
 subroutine chkrc(rc, mes)
    integer, intent(in)          :: rc   ! return code from time management library

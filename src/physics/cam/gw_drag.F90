@@ -626,6 +626,7 @@ subroutine gw_init()
         rdg_mxdis(pcols,prdg,begchunk:endchunk), &
         rdg_anixy(pcols,prdg,begchunk:endchunk), &
         rdg_angll(pcols,prdg,begchunk:endchunk)  )
+    
    
      call infld('GBXAR', fh_topo, dim1name, dim2name, 1, pcols, &
                          begchunk, endchunk, rdg_gbxar, found, gridname='physgrid')

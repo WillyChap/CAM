@@ -73,7 +73,7 @@ module CB24cnn
   !--------------------
   logical          :: CB24cnn_Model       =.true.
 
-
+contains
    !================================================================
   subroutine CB24cnn_init
     !
@@ -107,7 +107,7 @@ module CB24cnn
     ierror = my_list%append(3.14d0)
     ierror = print_py(my_list)
     
-    write(iulog,*)my_list
+!    write(iulog,*)my_list
 
     call my_list%destroy
     call forpy_finalize
@@ -119,7 +119,7 @@ module CB24cnn
    !------------
   end subroutine ! CB24cnn_init
 
-
+end module CB24cnn
 
 
 
