@@ -105,6 +105,7 @@ type(vdiff_selector) :: fieldlist_wet                ! Logical switches for mois
 type(vdiff_selector) :: fieldlist_dry                ! Logical switches for dry mixing ratio diffusion
 type(vdiff_selector) :: fieldlist_molec              ! Logical switches for molecular diffusion
 integer              :: tke_idx, kvh_idx, kvm_idx    ! TKE and eddy diffusivity indices for fields in the physics buffer
+integer              :: ustarwec_idx                 ! +++WEC
 integer              :: kvt_idx                      ! Index for kinematic molecular conductivity
 integer              :: turbtype_idx, smaw_idx       ! Turbulence type and instability functions
 integer              :: tauresx_idx, tauresy_idx     ! Redisual stress for implicit surface stress
@@ -231,6 +232,8 @@ subroutine vd_register()
 
   call pbuf_add_field('tpert', 'global', dtype_r8, (/pcols/),                       tpert_idx)
   call pbuf_add_field('qpert', 'global', dtype_r8, (/pcols,pcnst/),                 qpert_idx)
+  
+  call pbuf_add_field('ustarwec', 'global', dtype_r8, (/pcols/),                 ustarwec_idx) !++WEC
 
   if (trim(shallow_scheme) == 'UNICON') then
      call pbuf_add_field('qtl_flx',  'global', dtype_r8, (/pcols, pverp/), qtl_flx_idx)
@@ -606,6 +609,8 @@ subroutine vertical_diffusion_init(pbuf2d)
      call pbuf_set_field(pbuf2d, smaw_idx,     0.0_r8)
      call pbuf_set_field(pbuf2d, tauresx_idx,  0.0_r8)
      call pbuf_set_field(pbuf2d, tauresy_idx,  0.0_r8)
+     
+     
      if (trim(shallow_scheme) == 'UNICON') then
         call pbuf_set_field(pbuf2d, qtl_flx_idx,  0.0_r8)
         call pbuf_set_field(pbuf2d, qti_flx_idx,  0.0_r8)
@@ -863,6 +868,7 @@ subroutine vertical_diffusion_tend( &
   call pbuf_get_field(pbuf, qpert_idx,    qpert)
   call pbuf_get_field(pbuf, pblh_idx,     pblh)
   call pbuf_get_field(pbuf, turbtype_idx, turbtype)
+  
 
   ! Interpolate temperature to interfaces.
   do k = 2, pver
@@ -1472,7 +1478,10 @@ subroutine vertical_diffusion_tend( &
 
   call p%finalize()
   call p_dry%finalize()
-
+  
+  
+  !WEC set field 
+  call pbuf_set_field(pbuf, ustarwec_idx,  ustar) !+++WEC
 end subroutine vertical_diffusion_tend
 
 ! =============================================================================== !

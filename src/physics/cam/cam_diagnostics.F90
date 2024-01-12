@@ -210,12 +210,15 @@ contains
 
     call addfld ('Z3',         (/ 'lev' /), 'A', 'm',         'Geopotential Height (above sea level)')
     call addfld ('Z1000',      horiz_only,  'A', 'm',         'Geopotential Z at 1000 mbar pressure surface')
+    call addfld ('Z850',       horiz_only,  'A', 'm',         'Geopotential Z at 850 mbar pressure surface')
     call addfld ('Z700',       horiz_only,  'A', 'm',         'Geopotential Z at 700 mbar pressure surface')
     call addfld ('Z500',       horiz_only,  'A', 'm',         'Geopotential Z at 500 mbar pressure surface')
     call addfld ('Z300',       horiz_only,  'A', 'm',         'Geopotential Z at 300 mbar pressure surface')
     call addfld ('Z200',       horiz_only,  'A', 'm',         'Geopotential Z at 200 mbar pressure surface')
     call addfld ('Z100',       horiz_only,  'A', 'm',         'Geopotential Z at 100 mbar pressure surface')
     call addfld ('Z050',       horiz_only,  'A', 'm',         'Geopotential Z at 50 mbar pressure surface')
+    call addfld ('Z030',       horiz_only,  'A', 'm',         'Geopotential Z at 30 mbar pressure surface')
+    call addfld ('Z010',       horiz_only,  'A', 'm',         'Geopotential Z at 10 mbar pressure surface')
 
     call addfld ('ZZ',         (/ 'lev' /), 'A', 'm2',        'Eddy height variance' )
     call addfld ('VZ',         (/ 'lev' /), 'A', 'm2/s',      'Meridional transport of geopotential height')
@@ -247,6 +250,9 @@ contains
     call addfld ('T300',       horiz_only,  'A', 'K','Temperature at 300 mbar pressure surface')
     call addfld ('T200',       horiz_only,  'A', 'K','Temperature at 200 mbar pressure surface')
     call addfld ('T010',       horiz_only,  'A', 'K','Temperature at 10 mbar pressure surface')
+    call addfld ('T100',       horiz_only,  'A', 'K','Temperature at 100 mbar pressure surface')
+    call addfld ('T030',       horiz_only,  'A', 'K','Temperature at 30 mbar pressure surface')
+    call addfld ('T050',       horiz_only,  'A', 'K','Temperature at 50 mbar pressure surface')
 
     call addfld ('T7001000',   horiz_only,  'A', 'K','Temperature difference 700 mb - 1000 mb')
     call addfld ('TH7001000',  horiz_only,  'A', 'K','Theta difference 700 mb - 1000 mb')
@@ -263,11 +269,18 @@ contains
     call addfld ('U500',       horiz_only,  'A', 'm/s','Zonal wind at 500 mbar pressure surface')
     call addfld ('U250',       horiz_only,  'A', 'm/s','Zonal wind at 250 mbar pressure surface')
     call addfld ('U200',       horiz_only,  'A', 'm/s','Zonal wind at 200 mbar pressure surface')
+    call addfld ('U100',       horiz_only,  'A', 'm/s','Zonal wind at 100 mbar pressure surface')
+    call addfld ('U050',       horiz_only,  'A', 'm/s','Zonal wind at  50 mbar pressure surface')
+    call addfld ('U030',       horiz_only,  'A', 'm/s','Zonal wind at  30 mbar pressure surface')
     call addfld ('U010',       horiz_only,  'A', 'm/s','Zonal wind at  10 mbar pressure surface')
     call addfld ('V850',       horiz_only,  'A', 'm/s','Meridional wind at 850 mbar pressure surface')
     call addfld ('V500',       horiz_only,  'A', 'm/s','Meridional wind at 500 mbar pressure surface')
     call addfld ('V250',       horiz_only,  'A', 'm/s','Meridional wind at 250 mbar pressure surface')
     call addfld ('V200',       horiz_only,  'A', 'm/s','Meridional wind at 200 mbar pressure surface')
+    call addfld ('V100',       horiz_only,  'A', 'm/s','Meridional wind at 100 mbar pressure surface')
+    call addfld ('V050',       horiz_only,  'A', 'm/s','Meridional wind at  50 mbar pressure surface')
+    call addfld ('V030',       horiz_only,  'A', 'm/s','Meridional wind at  30 mbar pressure surface')
+    call addfld ('V010',       horiz_only,  'A', 'm/s','Meridional wind at  10 mbar pressure surface')
 
     call register_vector_field('U850', 'V850')
     call register_vector_field('U500', 'V500')
@@ -432,11 +445,20 @@ contains
     ! outfld calls in diag_phys_writeout
     call addfld ('OMEGAQ',     (/ 'lev' /), 'A', 'kgPa/kgs', 'Vertical water transport' )
     call addfld ('VQ',         (/ 'lev' /), 'A', 'm/skg/kg',  'Meridional water transport')
+    call addfld ('UQ',         (/ 'lev' /), 'A', 'm/skg/kg',  'Zonal water transport')
     call addfld ('QQ',         (/ 'lev' /), 'A', 'kg2/kg2',   'Eddy moisture variance')
 
     call addfld ('MQ',         (/ 'lev' /), 'A', 'kg/m2','Water vapor mass in layer')
     call addfld ('TMQ',        horiz_only,  'A', 'kg/m2','Total (vertically integrated) precipitable water')
+
+! cas fields
+    call addfld ('IVT',        horiz_only,  'A', 'kg/m/s','Total (vertically integrated) vapor transport')
+    call addfld ('uIVT',       horiz_only,  'A', 'kg/m/s','u-component (vertically integrated) vapor transport')
+    call addfld ('vIVT',       horiz_only,  'A', 'kg/m/s','v-component (vertically integrated) vapor transport')
+! end cas fields
+
     call addfld ('RELHUM',     (/ 'lev' /), 'A', 'percent','Relative humidity')
+    call addfld ('RH600',      horiz_only,  'A', 'percent','Relative humidity at 600 hPa')
     call addfld ('RHW',        (/ 'lev' /), 'A', 'percent','Relative humidity with respect to liquid')
     call addfld ('RHI',        (/ 'lev' /), 'A', 'percent','Relative humidity with respect to ice')
     call addfld ('RHCFMIP',    (/ 'lev' /), 'A', 'percent','Relative humidity with respect to water above 273 K, ice below 273 K')
@@ -967,6 +989,11 @@ contains
           extrapolate='Z', ln_interp=.true., ps=state%ps, phis=state%phis, tbot=state%t(:,pver))
       call outfld('Z1000    ', p_surf, pcols, lchnk)
     end if
+    if (hist_fld_active('Z850')) then
+      call vertinterp(ncol, pcols, pver, state%pmid, 85000._r8, z3, p_surf, &
+          extrapolate='Z', ln_interp=.true., ps=state%ps, phis=state%phis, tbot=state%t(:,pver))
+      call outfld('Z850    ', p_surf, pcols, lchnk)
+    end if
     if (hist_fld_active('Z700')) then
       call vertinterp(ncol, pcols, pver, state%pmid, 70000._r8, z3, p_surf, &
           extrapolate='Z', ln_interp=.true., ps=state%ps, phis=state%phis, tbot=state%t(:,pver))
@@ -978,21 +1005,36 @@ contains
       call outfld('Z500    ', p_surf, pcols, lchnk)
     end if
     if (hist_fld_active('Z300')) then
-      call vertinterp(ncol, pcols, pver, state%pmid, 30000._r8, z3, p_surf, ln_interp=.true.)
+      call vertinterp(ncol, pcols, pver, state%pmid, 30000._r8, z3, p_surf, &
+          extrapolate='Z', ln_interp=.true., ps=state%ps, phis=state%phis, tbot=state%t(:,pver))
       call outfld('Z300    ', p_surf, pcols, lchnk)
     end if
     if (hist_fld_active('Z200')) then
-      call vertinterp(ncol, pcols, pver, state%pmid, 20000._r8, z3, p_surf, ln_interp=.true.)
+      call vertinterp(ncol, pcols, pver, state%pmid, 20000._r8, z3, p_surf, &
+          extrapolate='Z', ln_interp=.true., ps=state%ps, phis=state%phis, tbot=state%t(:,pver))
       call outfld('Z200    ', p_surf, pcols, lchnk)
     end if
     if (hist_fld_active('Z100')) then
-      call vertinterp(ncol, pcols, pver, state%pmid, 10000._r8, z3, p_surf, ln_interp=.true.)
+      call vertinterp(ncol, pcols, pver, state%pmid, 10000._r8, z3, p_surf, &
+          extrapolate='Z', ln_interp=.true., ps=state%ps, phis=state%phis, tbot=state%t(:,pver))
       call outfld('Z100    ', p_surf, pcols, lchnk)
     end if
     if (hist_fld_active('Z050')) then
-      call vertinterp(ncol, pcols, pver, state%pmid,  5000._r8, z3, p_surf, ln_interp=.true.)
+      call vertinterp(ncol, pcols, pver, state%pmid,  5000._r8, z3, p_surf, &
+          extrapolate='Z', ln_interp=.true., ps=state%ps, phis=state%phis, tbot=state%t(:,pver))
       call outfld('Z050    ', p_surf, pcols, lchnk)
     end if
+    if (hist_fld_active('Z030')) then
+      call vertinterp(ncol, pcols, pver, state%pmid,  3000._r8, z3, p_surf, &
+          extrapolate='Z', ln_interp=.true., ps=state%ps, phis=state%phis, tbot=state%t(:,pver))
+      call outfld('Z030    ', p_surf, pcols, lchnk)
+    end if
+    if (hist_fld_active('Z010')) then
+      call vertinterp(ncol, pcols, pver, state%pmid,  1000._r8, z3, p_surf, &
+          extrapolate='Z', ln_interp=.true., ps=state%ps, phis=state%phis, tbot=state%t(:,pver))
+      call outfld('Z010    ', p_surf, pcols, lchnk)
+    end if
+
     !
     ! Quadratic height fiels Z3*Z3
     !
@@ -1079,11 +1121,13 @@ contains
       call outfld('T400    ', p_surf, pcols, lchnk )
     end if
     if (hist_fld_active('T300')) then
-      call vertinterp(ncol, pcols, pver, state%pmid, 30000._r8, state%t, p_surf)
+      call vertinterp(ncol, pcols, pver, state%pmid, 30000._r8, state%t, p_surf, &
+          extrapolate='T', ps=state%ps, phis=state%phis)
       call outfld('T300    ', p_surf, pcols, lchnk )
     end if
     if (hist_fld_active('T200')) then
-      call vertinterp(ncol, pcols, pver, state%pmid, 20000._r8, state%t, p_surf)
+      call vertinterp(ncol, pcols, pver, state%pmid, 20000._r8, state%t, p_surf, &
+          extrapolate='T', ps=state%ps, phis=state%phis)
       call outfld('T200    ', p_surf, pcols, lchnk )
     end if
     if (hist_fld_active('U850')) then
@@ -1101,6 +1145,18 @@ contains
     if (hist_fld_active('U200')) then
       call vertinterp(ncol, pcols, pver, state%pmid, 20000._r8, state%u, p_surf)
       call outfld('U200    ', p_surf, pcols, lchnk )
+    end if
+    if (hist_fld_active('U100')) then
+      call vertinterp(ncol, pcols, pver, state%pmid, 10000._r8, state%u, p_surf)
+      call outfld('U100    ', p_surf, pcols, lchnk )
+    end if
+    if (hist_fld_active('U050')) then
+      call vertinterp(ncol, pcols, pver, state%pmid,  5000._r8, state%u, p_surf)
+      call outfld('U050    ', p_surf, pcols, lchnk )
+    end if
+    if (hist_fld_active('U030')) then
+      call vertinterp(ncol, pcols, pver, state%pmid,  3000._r8, state%u, p_surf)
+      call outfld('U030    ', p_surf, pcols, lchnk )
     end if
     if (hist_fld_active('U010')) then
       call vertinterp(ncol, pcols, pver, state%pmid,  1000._r8, state%u, p_surf)
@@ -1121,6 +1177,22 @@ contains
     if (hist_fld_active('V200')) then
       call vertinterp(ncol, pcols, pver, state%pmid, 20000._r8, state%v, p_surf)
       call outfld('V200    ', p_surf, pcols, lchnk )
+    end if
+    if (hist_fld_active('V100')) then
+      call vertinterp(ncol, pcols, pver, state%pmid, 10000._r8, state%v, p_surf)
+      call outfld('V100    ', p_surf, pcols, lchnk )
+    end if
+    if (hist_fld_active('V050')) then
+      call vertinterp(ncol, pcols, pver, state%pmid, 5000._r8, state%v, p_surf)
+      call outfld('V050    ', p_surf, pcols, lchnk )
+    end if
+    if (hist_fld_active('V030')) then
+      call vertinterp(ncol, pcols, pver, state%pmid, 3000._r8, state%v, p_surf)
+      call outfld('V030    ', p_surf, pcols, lchnk )
+    end if
+    if (hist_fld_active('V010')) then
+      call vertinterp(ncol, pcols, pver, state%pmid, 1000._r8, state%v, p_surf)
+      call outfld('V010    ', p_surf, pcols, lchnk )
     end if
 
     ftem(:ncol,:) = state%t(:ncol,:)*state%t(:ncol,:)
@@ -1213,6 +1285,25 @@ contains
       call outfld('T010           ', p_surf, pcols, lchnk )
     end if
 
+    if (hist_fld_active('T100')) then
+      call vertinterp(ncol, pcols, pver, state%pmid, 10000._r8, state%t, p_surf, &
+          extrapolate='T', ps=state%ps, phis=state%phis)
+      call outfld('T100           ', p_surf, pcols, lchnk )
+    end if
+
+    if (hist_fld_active('T030')) then
+      call vertinterp(ncol, pcols, pver, state%pmid, 3000._r8, state%t, p_surf, &
+          extrapolate='T', ps=state%ps, phis=state%phis)
+      call outfld('T030           ', p_surf, pcols, lchnk )
+    end if
+
+    if (hist_fld_active('T050')) then
+      call vertinterp(ncol, pcols, pver, state%pmid, 5000._r8, state%t, p_surf, &
+          extrapolate='T', ps=state%ps, phis=state%phis)
+      call outfld('T050           ', p_surf, pcols, lchnk )
+    end if
+
+
     !---------------------------------------------------------
     ! tidal diagnostics
     !---------------------------------------------------------
@@ -1248,6 +1339,8 @@ contains
     real(r8) :: ftem(pcols,pver) ! temporary workspace
     real(r8) :: ftem1(pcols,pver) ! another temporary workspace
     real(r8) :: ftem2(pcols,pver) ! another temporary workspace
+    real(r8) :: ftem4(pcols,pver) ! another temporary workspace
+    real(r8) :: ftem5(pcols,pver) ! another temporary workspace
     real(r8) :: z3(pcols,pver)   ! geo-potential height
     real(r8) :: p_surf(pcols)    ! data interpolated to a pressure surface
     real(r8) :: p_surf_q1(pcols)    ! data interpolated to a pressure surface
@@ -1289,6 +1382,9 @@ contains
     ftem(:ncol,:) = state%v(:ncol,:)*state%q(:ncol,:,1)
     call outfld ('VQ      ',ftem    ,pcols   ,lchnk     )
 
+    ftem(:ncol,:) = state%u(:ncol,:)*state%q(:ncol,:,1)
+    call outfld ('UQ      ',ftem    ,pcols   ,lchnk     )
+
     ftem(:ncol,:) = state%q(:ncol,:,1)*state%q(:ncol,:,1)
     call outfld ('QQ      ',ftem    ,pcols   ,lchnk     )
 
@@ -1306,6 +1402,32 @@ contains
     end do
     call outfld ('TMQ     ',ftem, pcols   ,lchnk     )
 
+!CAS integrated vapor transport calculation
+
+    !compute uq*dp/g and vq*dp/g
+    ftem4(:ncol,:) = state%q(:ncol,:,1) * state%u(:ncol,:) *state%pdel(:ncol,:) * rga
+    ftem5(:ncol,:) = state%q(:ncol,:,1) * state%v(:ncol,:) *state%pdel(:ncol,:) * rga
+
+    !integrate each component
+    do k=2,pver
+       ftem4(:ncol,1) = ftem4(:ncol,1) + ftem4(:ncol,k)
+       ftem5(:ncol,1) = ftem5(:ncol,1) + ftem5(:ncol,k)
+    end do
+    !compute ivt
+    ftem(:ncol,1) = sqrt( ftem4(:ncol,1)**2 + ftem5(:ncol,1)**2)
+
+    call outfld ('IVT     ',ftem, pcols   ,lchnk     )
+ 
+    !just output uq*dp/g
+    ftem(:ncol,1) =  ftem4(:ncol,1)
+    call outfld ('uIVT     ',ftem, pcols   ,lchnk     )
+
+    !just output vq*dp/g
+    ftem(:ncol,1) = ftem5(:ncol,1)
+    call outfld ('vIVT     ',ftem, pcols   ,lchnk     )
+
+!CAS
+
     ! Relative humidity
     if (hist_fld_active('RELHUM')) then
        if (relhum_idx > 0) then
@@ -1318,6 +1440,15 @@ contains
        end if
        call outfld ('RELHUM  ',ftem    ,pcols   ,lchnk     )
     end if
+
+    if (hist_fld_active('RH600')) then
+       call qsat(state%t(:ncol,:), state%pmid(:ncol,:), &
+            tem2(:ncol,:), ftem(:ncol,:))
+       ftem(:ncol,:) = state%q(:ncol,:,1)/ftem(:ncol,:)*100._r8
+       call vertinterp(ncol, pcols, pver, state%pmid, 60000._r8, ftem, p_surf)
+       call outfld('RH600    ', p_surf, pcols, lchnk )
+    end if
+
 
     if (hist_fld_active('RHW') .or. hist_fld_active('RHI') .or. hist_fld_active('RHCFMIP') ) then
 

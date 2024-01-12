@@ -2,43 +2,43 @@ module nudging
 !=====================================================================
 !
 ! Purpose: Implement Nudging of the model state of U,V,T,Q, and/or PS
-!          toward specified values from analyses. 
+!          toward specified values from analyses.
 !
 ! Author: Patrick Callaghan
 !
 ! Description:
-!    
-!    This module assumes that the user has {U,V,T,Q,PS} values from analyses 
-!    which have been preprocessed onto the current model grid and adjusted 
-!    for differences in topography. It is also assumed that these resulting 
-!    values and are stored in individual files which are indexed with respect 
-!    to year, month, day, and second of the day. When the model is inbetween 
-!    the given begining and ending times, a relaxation forcing is added to 
-!    nudge the model toward the analyses values determined from the forcing 
-!    option specified. After the model passes the ending analyses time, the 
+!
+!    This module assumes that the user has {U,V,T,Q,PS} values from analyses
+!    which have been preprocessed onto the current model grid and adjusted
+!    for differences in topography. It is also assumed that these resulting
+!    values and are stored in individual files which are indexed with respect
+!    to year, month, day, and second of the day. When the model is inbetween
+!    the given begining and ending times, a relaxation forcing is added to
+!    nudge the model toward the analyses values determined from the forcing
+!    option specified. After the model passes the ending analyses time, the
 !    forcing discontinues.
 !
 !    Some analyses products can have gaps in the available data, where values
-!    are missing for some interval of time. When files are missing, the nudging 
+!    are missing for some interval of time. When files are missing, the nudging
 !    force is switched off for that interval of time, so we effectively 'coast'
-!    thru the gap. 
+!    thru the gap.
 !
 !    Currently, the nudging module is set up to accomodate nudging of PS
 !    values, however that functionality requires forcing that is applied in
-!    the selected dycore and is not yet implemented. 
+!    the selected dycore and is not yet implemented.
 !
-!    The nudging of the model toward the analyses data is controlled by 
+!    The nudging of the model toward the analyses data is controlled by
 !    the 'nudging_nl' namelist in 'user_nl_cam'; whose variables control the
 !    time interval over which nudging is applied, the strength of the nudging
-!    tendencies, and its spatial distribution. 
+!    tendencies, and its spatial distribution.
 !
 !    FORCING:
 !    --------
 !    Nudging tendencies are applied as a relaxation force between the current
 !    model state values and target state values derived from the avalilable
 !    analyses. The form of the target values is selected by the 'Nudge_Force_Opt'
-!    option, the timescale of the forcing is determined from the given 
-!    'Nudge_TimeScale_Opt', and the nudging strength Alpha=[0.,1.] for each 
+!    option, the timescale of the forcing is determined from the given
+!    'Nudge_TimeScale_Opt', and the nudging strength Alpha=[0.,1.] for each
 !    variable is specified by the 'Nudge_Xcoef' values. Where X={U,V,T,Q,PS}
 !
 !           F_nudge = Alpha*((Target-Model(t_curr))/TimeScale
@@ -46,41 +46,41 @@ module nudging
 !
 !    WINDOWING:
 !    ----------
-!    The region of applied nudging can be limited using Horizontal/Vertical 
-!    window functions that are constructed using a parameterization of the 
-!    Heaviside step function. 
+!    The region of applied nudging can be limited using Horizontal/Vertical
+!    window functions that are constructed using a parameterization of the
+!    Heaviside step function.
 !
-!    The Heaviside window function is the product of separate horizonal and vertical 
+!    The Heaviside window function is the product of separate horizonal and vertical
 !    windows that are controled via 12 parameters:
 !
-!        Nudge_Hwin_lat0:     Specify the horizontal center of the window in degrees. 
-!        Nudge_Hwin_lon0:     The longitude must be in the range [0,360] and the 
+!        Nudge_Hwin_lat0:     Specify the horizontal center of the window in degrees.
+!        Nudge_Hwin_lon0:     The longitude must be in the range [0,360] and the
 !                             latitude should be [-90,+90].
-!        Nudge_Hwin_latWidth: Specify the lat and lon widths of the window as positive 
-!        Nudge_Hwin_lonWidth: values in degrees.Setting a width to a large value (e.g. 999) 
+!        Nudge_Hwin_latWidth: Specify the lat and lon widths of the window as positive
+!        Nudge_Hwin_lonWidth: values in degrees.Setting a width to a large value (e.g. 999)
 !                             renders the window a constant in that direction.
-!        Nudge_Hwin_latDelta: Controls the sharpness of the window transition with a 
-!        Nudge_Hwin_lonDelta: length in degrees. Small non-zero values yeild a step 
+!        Nudge_Hwin_latDelta: Controls the sharpness of the window transition with a
+!        Nudge_Hwin_lonDelta: length in degrees. Small non-zero values yeild a step
 !                             function while a large value yeilds a smoother transition.
-!        Nudge_Hwin_Invert  : A logical flag used to invert the horizontal window function 
+!        Nudge_Hwin_Invert  : A logical flag used to invert the horizontal window function
 !                             to get its compliment.(e.g. to nudge outside a given window).
 !
-!        Nudge_Vwin_Lindex:   In the vertical, the window is specified in terms of model 
-!        Nudge_Vwin_Ldelta:   level indcies. The High and Low transition levels should 
-!        Nudge_Vwin_Hindex:   range from [0,(NLEV+1)]. The transition lengths are also 
-!        Nudge_Vwin_Hdelta:   specified in terms of model indices. For a window function 
+!        Nudge_Vwin_Lindex:   In the vertical, the window is specified in terms of model
+!        Nudge_Vwin_Ldelta:   level indcies. The High and Low transition levels should
+!        Nudge_Vwin_Hindex:   range from [0,(NLEV+1)]. The transition lengths are also
+!        Nudge_Vwin_Hdelta:   specified in terms of model indices. For a window function
 !                             constant in the vertical, the Low index should be set to 0,
-!                             the High index should be set to (NLEV+1), and the transition 
-!                             lengths should be set to 0.001 
-!        Nudge_Vwin_Invert  : A logical flag used to invert the vertical window function 
+!                             the High index should be set to (NLEV+1), and the transition
+!                             lengths should be set to 0.001
+!        Nudge_Vwin_Invert  : A logical flag used to invert the vertical window function
 !                             to get its compliment.
 !
-!        EXAMPLE: For a channel window function centered at the equator and independent 
+!        EXAMPLE: For a channel window function centered at the equator and independent
 !                 of the vertical (30 levels):
 !                        Nudge_Hwin_lat0     = 0.         Nudge_Vwin_Lindex = 0.
 !                        Nudge_Hwin_latWidth = 30.        Nudge_Vwin_Ldelta = 0.001
 !                        Nudge_Hwin_latDelta = 5.0        Nudge_Vwin_Hindex = 31.
-!                        Nudge_Hwin_lon0     = 180.       Nudge_Vwin_Hdelta = 0.001 
+!                        Nudge_Hwin_lon0     = 180.       Nudge_Vwin_Hdelta = 0.001
 !                        Nudge_Hwin_lonWidth = 999.       Nudge_Vwin_Invert = .false.
 !                        Nudge_Hwin_lonDelta = 1.0
 !                        Nudge_Hwin_Invert   = .false.
@@ -89,18 +89,18 @@ module nudging
 !                 not at the equator, the settings would be similar but with:
 !                        Nudge_Hwin_Invert = .true.
 !
-!    A user can preview the window resulting from a given set of namelist values before 
-!    running the model. Lookat_NudgeWindow.ncl is a script avalable in the tools directory 
+!    A user can preview the window resulting from a given set of namelist values before
+!    running the model. Lookat_NudgeWindow.ncl is a script avalable in the tools directory
 !    which will read in the values for a given namelist and display the resulting window.
 !
-!    The module is currently configured for only 1 window function. It can readily be 
+!    The module is currently configured for only 1 window function. It can readily be
 !    extended for multiple windows if the need arises.
 !
 !
 ! Input/Output Values:
-!    Forcing contributions are available for history file output by 
+!    Forcing contributions are available for history file output by
 !    the names:    {'Nudge_U','Nudge_V','Nudge_T',and 'Nudge_Q'}
-!    The target values that the model state is nudged toward are available for history 
+!    The target values that the model state is nudged toward are available for history
 !    file output via the variables:  {'Target_U','Target_V','Target_T',and 'Target_Q'}
 !
 !    &nudging_nl
@@ -120,9 +120,9 @@ module nudging
 !                              4 --> 6 hourly analyses.
 !                              8 --> 3 hourly.
 !
-!      Model_Times_Per_Day - INT Number of times to update the model state (used for nudging) 
-!                                each day. The value is restricted to be longer than the 
-!                                current model timestep and shorter than the analyses 
+!      Model_Times_Per_Day - INT Number of times to update the model state (used for nudging)
+!                                each day. The value is restricted to be longer than the
+!                                current model timestep and shorter than the analyses
 !                                timestep. As this number is increased, the nudging
 !                                force has the form of newtonian cooling.
 !                              48 --> 1800 Second timestep.
@@ -135,8 +135,8 @@ module nudging
 !      Nudge_End_Month     - INT nudging ending month.   [1-12]
 !      Nudge_End_Day       - INT nudging ending day.     [1-31]
 !
-!      Nudge_Force_Opt     - INT Index to select the nudging Target for a relaxation 
-!                                forcing of the form: 
+!      Nudge_Force_Opt     - INT Index to select the nudging Target for a relaxation
+!                                forcing of the form:
 !                                where (t'==Analysis times ; t==Model Times)
 !
 !                              0 -> NEXT-OBS: Target=Anal(t'_next)                 [DEFAULT]
@@ -144,7 +144,7 @@ module nudging
 !                                                 F =(t'_next - t_curr )/Tdlt_Anal
 !
 !      Nudge_TimeScale_Opt - INT Index to select the timescale for nudging.
-!                                where (t'==Analysis times ; t==Model Times) 
+!                                where (t'==Analysis times ; t==Model Times)
 !
 !                              0 -->  TimeScale = 1/Tdlt_Anal                      [DEFAULT]
 !                              1 -->  TimeScale = 1/(t'_next - t_curr )
@@ -160,15 +160,15 @@ module nudging
 !                                         1 == CONSTANT (Spatially Uniform Nudging)
 !                                         2 == HEAVISIDE WINDOW FUNCTION
 !
-!      Nudge_Ucoef         - REAL fractional nudging coeffcient for U. 
-!      Nudge_Vcoef         - REAL fractional nudging coeffcient for V. 
-!      Nudge_Tcoef         - REAL fractional nudging coeffcient for T. 
-!      Nudge_Qcoef         - REAL fractional nudging coeffcient for Q. 
-!      Nudge_PScoef        - REAL fractional nudging coeffcient for PS. 
+!      Nudge_Ucoef         - REAL fractional nudging coeffcient for U.
+!      Nudge_Vcoef         - REAL fractional nudging coeffcient for V.
+!      Nudge_Tcoef         - REAL fractional nudging coeffcient for T.
+!      Nudge_Qcoef         - REAL fractional nudging coeffcient for Q.
+!      Nudge_PScoef        - REAL fractional nudging coeffcient for PS.
 !
-!                                 The strength of the nudging is specified as a fractional 
+!                                 The strength of the nudging is specified as a fractional
 !                                 coeffcient between [0,1].
-!           
+!
 !      Nudge_Hwin_lat0     - REAL latitudinal center of window in degrees.
 !      Nudge_Hwin_lon0     - REAL longitudinal center of window in degrees.
 !      Nudge_Hwin_latWidth - REAL latitudinal width of window in degrees.
@@ -179,8 +179,8 @@ module nudging
 !                                    TRUE = value=0 inside the specified window, 1 outside
 !      Nudge_Vwin_Lindex   - REAL LO model index of transition
 !      Nudge_Vwin_Hindex   - REAL HI model index of transition
-!      Nudge_Vwin_Ldelta   - REAL LO transition length 
-!      Nudge_Vwin_Hdelta   - REAL HI transition length 
+!      Nudge_Vwin_Ldelta   - REAL LO transition length
+!      Nudge_Vwin_Hdelta   - REAL HI transition length
 !      Nudge_Vwin_Invert   - LOGICAL FALSE= value=1 inside the specified window, 0 outside
 !                                    TRUE = value=0 inside the specified window, 1 outside
 !    /
@@ -190,12 +190,12 @@ module nudging
 ! TO DO:
 ! -----------
 !    ** Implement Ps Nudging????
-!          
+!
 !=====================================================================
   ! Useful modules
   !------------------
   use shr_kind_mod,   only:r8=>SHR_KIND_R8,cs=>SHR_KIND_CS,cl=>SHR_KIND_CL
-  use time_manager,   only:timemgr_time_ge,timemgr_time_inc,get_curr_date,get_step_size
+  use time_manager,   only:timemgr_time_ge,timemgr_time_inc,timemgr_time_inc_minus,get_curr_date,get_step_size
   use phys_grid   ,   only:scatter_field_to_chunk
   use cam_abortutils, only:endrun
   use spmd_utils  ,   only:masterproc
@@ -204,7 +204,7 @@ module nudging
   use mpishorthand
 #endif
 
-  ! Set all Global values and routines to private by default 
+  ! Set all Global values and routines to private by default
   ! and then explicitly set their exposure.
   !----------------------------------------------------------
   implicit none
@@ -229,6 +229,7 @@ module nudging
   logical          :: Nudge_Initialized =.false.
   character(len=cl):: Nudge_Path
   character(len=cs):: Nudge_File,Nudge_File_Template
+  character(len=cs):: Ran_File
   integer          :: Nudge_Force_Opt
   integer          :: Nudge_TimeScale_Opt
   integer          :: Nudge_TSmode
@@ -248,7 +249,11 @@ module nudging
   integer          :: Nudge_Curr_Day ,Nudge_Curr_Sec
   integer          :: Nudge_Next_Year,Nudge_Next_Month
   integer          :: Nudge_Next_Day ,Nudge_Next_Sec
+  integer          :: Random_Next_Year,Random_Next_Month !++WEC
+  integer          :: Random_Next_Day ,Random_Next_Sec !++WEC
+  integer          :: Memory_Rand !++WEC
   integer          :: Nudge_Step
+  integer          :: Nudge_Climo_Year  = 1000
   integer          :: Model_Curr_Year,Model_Curr_Month
   integer          :: Model_Curr_Day ,Model_Curr_Sec
   integer          :: Model_Next_Year,Model_Next_Month
@@ -274,6 +279,7 @@ module nudging
   real(r8)         :: Nudge_Hwin_lonWidthH
   real(r8)         :: Nudge_Hwin_max
   real(r8)         :: Nudge_Hwin_min
+  integer          :: Nudge_Do !adding control [WEC]
 
   ! Nudging State Arrays
   !-----------------------
@@ -315,9 +321,9 @@ module nudging
 contains
   !================================================================
   subroutine nudging_readnl(nlfile)
-   ! 
-   ! NUDGING_READNL: Initialize default values controlling the Nudging 
-   !                 process. Then read namelist values to override 
+   !
+   ! NUDGING_READNL: Initialize default values controlling the Nudging
+   !                 process. Then read namelist values to override
    !                 them.
    !===============================================================
    use ppgrid        ,only: pver
@@ -349,7 +355,7 @@ contains
                          Nudge_Hwin_Invert,                            &
                          Nudge_Vwin_Lindex,Nudge_Vwin_Hindex,          &
                          Nudge_Vwin_Ldelta,Nudge_Vwin_Hdelta,          &
-                         Nudge_Vwin_Invert                            
+                         Nudge_Vwin_Invert
 
    ! Nudging is NOT initialized yet, For now
    ! Nudging will always begin/end at midnight.
@@ -401,6 +407,8 @@ contains
    Nudge_Vwin_Invert   = .false.
    Nudge_Vwin_lo       = 0.0_r8
    Nudge_Vwin_hi       = 1.0_r8
+   Nudge_Do            = 1 !adding control to start ML [WEC]
+   Memory_Rand         = 5 !++WEC
 
    ! Read in namelist values
    !------------------------
@@ -436,7 +444,7 @@ contains
      Nudge_Vwin_hi = 1.0_r8
    endif
 
-   ! Check for valid namelist values 
+   ! Check for valid namelist values
    !----------------------------------
    if((Nudge_Hwin_lat0.lt.-90._r8).or.(Nudge_Hwin_lat0.gt.+90._r8)) then
      write(iulog,*) 'NUDGING: Window lat0 must be in [-90,+90]'
@@ -537,7 +545,7 @@ contains
 
   !================================================================
   subroutine nudging_init
-   ! 
+   !
    ! NUDGING_INIT: Allocate space and initialize Nudging values
    !===============================================================
    use ppgrid        ,only: pver,pcols,begchunk,endchunk
@@ -551,7 +559,7 @@ contains
 
    ! Local values
    !----------------
-   integer  Year,Month,Day,Sec
+   integer  Year,Month,Day,Sec,Climo_Year
    integer  YMD1,YMD
    logical  After_Beg,Before_End
    integer  istat,lchnk,ncol,icol,ilev
@@ -597,7 +605,7 @@ contains
    allocate(Model_PS(pcols,begchunk:endchunk),stat=istat)
    call alloc_err(istat,'nudging_init','Model_PS',pcols*((endchunk-begchunk)+1))
 
-   ! Allocate Space for spatial dependence of 
+   ! Allocate Space for spatial dependence of
    ! Nudging Coefs and Nudging Forcing.
    !-------------------------------------------
    allocate(Nudge_Utau(pcols,pver,begchunk:endchunk),stat=istat)
@@ -628,11 +636,18 @@ contains
    call addfld( 'Nudge_V',(/ 'lev' /),'A','m/s/s'  ,'V Nudging Tendency')
    call addfld( 'Nudge_T',(/ 'lev' /),'A','K/s'    ,'T Nudging Tendency')
    call addfld( 'Nudge_Q',(/ 'lev' /),'A','kg/kg/s','Q Nudging Tendency')
-   call addfld('Target_U',(/ 'lev' /),'A','m/s'    ,'U Nudging Target'  )
-   call addfld('Target_V',(/ 'lev' /),'A','m/s'    ,'V Nudging Target'  )
-   call addfld('Target_T',(/ 'lev' /),'A','K'      ,'T Nudging Target'  )
-   call addfld('Target_Q',(/ 'lev' /),'A','kg/kg'  ,'Q Nudging Target  ')
 
+   if(Nudge_Do==1) then
+      call addfld('Target_U',(/ 'lev' /),'A','m/s/s'    ,'U Nudging Target'  ) !need to edit units if we nudge ML 'm/s/s' [WEC]
+      call addfld('Target_V',(/ 'lev' /),'A','m/s/s'    ,'V Nudging Target'  ) !need to edit units if we nudge ML 'm/s/s' [WEC]
+      call addfld('Target_T',(/ 'lev' /),'A','K/s'      ,'T Nudging Target'  ) !need to edit units if we nudge ML 'K/s' [WEC
+      call addfld('Target_Q',(/ 'lev' /),'A','kg/kg/s'  ,'Q Nudging Target  ') !need to edit units if we nudge ML 'kg/kg/s' [WEC]
+   else
+      call addfld('Target_U',(/ 'lev' /),'A','m/s'    ,'U Nudging Target'  )
+      call addfld('Target_V',(/ 'lev' /),'A','m/s'    ,'V Nudging Target'  )
+      call addfld('Target_T',(/ 'lev' /),'A','K'      ,'T Nudging Target'  )
+      call addfld('Target_Q',(/ 'lev' /),'A','kg/kg'  ,'Q Nudging Target  ')
+   endif
    !-----------------------------------------
    ! Values initialized only by masterproc
    !-----------------------------------------
@@ -677,9 +692,9 @@ contains
      YMD1=(Nudge_End_Year*10000) + (Nudge_End_Month*100) + Nudge_End_Day
      call timemgr_time_ge(YMD ,Sec          ,          &
                           YMD1,Nudge_End_Sec,Before_End)
-  
+
      if((After_Beg).and.(Before_End)) then
-       ! Set Time indicies so that the next call to 
+       ! Set Time indicies so that the next call to
        ! timestep_init will initialize the data arrays.
        !--------------------------------------------
        Model_Next_Year =Year
@@ -690,6 +705,13 @@ contains
        Nudge_Next_Month=Month
        Nudge_Next_Day  =Day
        Nudge_Next_Sec  =(Sec/Nudge_Step)*Nudge_Step
+       
+       !++WEC
+       Random_Next_Year =Year
+       Random_Next_Month=Month
+       Random_Next_Day  =Day
+       Random_Next_Sec  =(Sec/Nudge_Step)*Nudge_Step
+       !--WEC
      elseif(.not.After_Beg) then
        ! Set Time indicies to Nudging start,
        ! timestep_init will initialize the data arrays.
@@ -702,6 +724,13 @@ contains
        Nudge_Next_Month=Nudge_Beg_Month
        Nudge_Next_Day  =Nudge_Beg_Day
        Nudge_Next_Sec  =Nudge_Beg_Sec
+       
+       !++WEC
+       Random_Next_Year =Nudge_Beg_Year
+       Random_Next_Month=Nudge_Beg_Month
+       Random_Next_Day  =Nudge_Beg_Day
+       Random_Next_Sec  =Nudge_Beg_Sec
+       !--WEC  
      elseif(.not.Before_End) then
        ! Nudging will never occur, so switch it off
        !--------------------------------------------
@@ -713,7 +742,7 @@ contains
        write(iulog,*) ' '
      endif
 
-     ! Initialize values for window function  
+     ! Initialize values for window function
      !----------------------------------------
      lonp= 180._r8
      lon0=   0._r8
@@ -721,7 +750,7 @@ contains
      latp=  90._r8-Nudge_Hwin_lat0
      lat0=   0._r8
      latn= -90._r8-Nudge_Hwin_lat0
-    
+
      Nudge_Hwin_lonWidthH=Nudge_Hwin_lonWidth/2._r8
      Nudge_Hwin_latWidthH=Nudge_Hwin_latWidth/2._r8
 
@@ -746,7 +775,7 @@ contains
                         (Val1_n*Val2_n*Val3_p*Val4_p))
 
      ! Initialize number of nudging observation values to keep track of.
-     ! Allocate and initialize observation indices 
+     ! Allocate and initialize observation indices
      !-----------------------------------------------------------------
      if((Nudge_Force_Opt.ge.0).and.(Nudge_Force_Opt.le.1)) then
        Nudge_NumObs=2
@@ -767,7 +796,7 @@ contains
      end do
      Nudge_File_Present(:)=.false.
 
-     ! Initialization is done, 
+     ! Initialization is done,
      !--------------------------
      Nudge_Initialized=.true.
 
@@ -788,8 +817,8 @@ contains
      write(iulog,*) 'NUDGING: Nudge_Model=',Nudge_Model
      write(iulog,*) 'NUDGING: Nudge_Path=',Nudge_Path
      write(iulog,*) 'NUDGING: Nudge_File_Template =',Nudge_File_Template
-     write(iulog,*) 'NUDGING: Nudge_Force_Opt=',Nudge_Force_Opt    
-     write(iulog,*) 'NUDGING: Nudge_TimeScale_Opt=',Nudge_TimeScale_Opt    
+     write(iulog,*) 'NUDGING: Nudge_Force_Opt=',Nudge_Force_Opt
+     write(iulog,*) 'NUDGING: Nudge_TimeScale_Opt=',Nudge_TimeScale_Opt
      write(iulog,*) 'NUDGING: Nudge_TSmode=',Nudge_TSmode
      write(iulog,*) 'NUDGING: Nudge_Times_Per_Day=',Nudge_Times_Per_Day
      write(iulog,*) 'NUDGING: Model_Times_Per_Day=',Model_Times_Per_Day
@@ -817,14 +846,14 @@ contains
      write(iulog,*) 'NUDGING: Nudge_Hwin_lon0     =',Nudge_Hwin_lon0
      write(iulog,*) 'NUDGING: Nudge_Hwin_lonWidth =',Nudge_Hwin_lonWidth
      write(iulog,*) 'NUDGING: Nudge_Hwin_lonDelta =',Nudge_Hwin_lonDelta
-     write(iulog,*) 'NUDGING: Nudge_Hwin_Invert   =',Nudge_Hwin_Invert  
+     write(iulog,*) 'NUDGING: Nudge_Hwin_Invert   =',Nudge_Hwin_Invert
      write(iulog,*) 'NUDGING: Nudge_Hwin_lo       =',Nudge_Hwin_lo
      write(iulog,*) 'NUDGING: Nudge_Hwin_hi       =',Nudge_Hwin_hi
      write(iulog,*) 'NUDGING: Nudge_Vwin_Hindex   =',Nudge_Vwin_Hindex
      write(iulog,*) 'NUDGING: Nudge_Vwin_Hdelta   =',Nudge_Vwin_Hdelta
      write(iulog,*) 'NUDGING: Nudge_Vwin_Lindex   =',Nudge_Vwin_Lindex
      write(iulog,*) 'NUDGING: Nudge_Vwin_Ldelta   =',Nudge_Vwin_Ldelta
-     write(iulog,*) 'NUDGING: Nudge_Vwin_Invert   =',Nudge_Vwin_Invert  
+     write(iulog,*) 'NUDGING: Nudge_Vwin_Invert   =',Nudge_Vwin_Invert
      write(iulog,*) 'NUDGING: Nudge_Vwin_lo       =',Nudge_Vwin_lo
      write(iulog,*) 'NUDGING: Nudge_Vwin_hi       =',Nudge_Vwin_hi
      write(iulog,*) 'NUDGING: Nudge_Hwin_latWidthH=',Nudge_Hwin_latWidthH
@@ -850,6 +879,11 @@ contains
    call mpibcast(Nudge_Next_Year     ,            1, mpiint, 0, mpicom)
    call mpibcast(Nudge_Next_Month    ,            1, mpiint, 0, mpicom)
    call mpibcast(Nudge_Next_Day      ,            1, mpiint, 0, mpicom)
+   call mpibcast(Random_Next_Sec     ,            1, mpiint, 0, mpicom) !++WEC
+   call mpibcast(Random_Next_Year    ,            1, mpiint, 0, mpicom) !++WEC
+   call mpibcast(Random_Next_Month   ,            1, mpiint, 0, mpicom) !++WEC
+   call mpibcast(Random_Next_Day     ,            1, mpiint, 0, mpicom) !++WEC
+   call mpibcast(Memory_Rand         ,            1, mpiint, 0, mpicom) !++WEC
    call mpibcast(Nudge_Next_Sec      ,            1, mpiint, 0, mpicom)
    call mpibcast(Nudge_Model         ,            1, mpilog, 0, mpicom)
    call mpibcast(Nudge_ON            ,            1, mpilog, 0, mpicom)
@@ -914,7 +948,7 @@ contains
    ! Initialize the analysis filename at the NEXT time for startup.
    !---------------------------------------------------------------
    Nudge_File=interpret_filename_spec(Nudge_File_Template      , &
-                                       yr_spec=Nudge_Next_Year , &
+                                       yr_spec=Nudge_Climo_Year , &
                                       mon_spec=Nudge_Next_Month, &
                                       day_spec=Nudge_Next_Day  , &
                                       sec_spec=Nudge_Next_Sec    )
@@ -922,8 +956,8 @@ contains
     write(iulog,*) 'NUDGING: Reading analyses:',trim(Nudge_Path)//trim(Nudge_File)
    endif
 
-   ! Rotate Nudge_ObsInd() indices for new data, then update 
-   ! the Nudge observation arrays with analysis data at the 
+   ! Rotate Nudge_ObsInd() indices for new data, then update
+   ! the Nudge observation arrays with analysis data at the
    ! NEXT==Nudge_ObsInd(1) time.
    !----------------------------------------------------------
    if(dycore_is('UNSTRUCTURED')) then
@@ -954,16 +988,30 @@ contains
 
        Nudge_PStau(icol,lchnk)=nudging_set_PSprofile(rlat,rlon,Nudge_PSprof)
      end do
-     Nudge_Utau(:ncol,:pver,lchnk) =                             &
-     Nudge_Utau(:ncol,:pver,lchnk) * Nudge_Ucoef/float(Nudge_Step)
-     Nudge_Vtau(:ncol,:pver,lchnk) =                             &
-     Nudge_Vtau(:ncol,:pver,lchnk) * Nudge_Vcoef/float(Nudge_Step)
-     Nudge_Stau(:ncol,:pver,lchnk) =                             &
-     Nudge_Stau(:ncol,:pver,lchnk) * Nudge_Tcoef/float(Nudge_Step)
-     Nudge_Qtau(:ncol,:pver,lchnk) =                             &
-     Nudge_Qtau(:ncol,:pver,lchnk) * Nudge_Qcoef/float(Nudge_Step)
-     Nudge_PStau(:ncol,lchnk)=                             &
-     Nudge_PStau(:ncol,lchnk)* Nudge_PScoef/float(Nudge_Step)
+
+     if(Nudge_Do==1) then
+       Nudge_Utau(:ncol,:pver,lchnk) =                             &
+       Nudge_Utau(:ncol,:pver,lchnk) * Nudge_Ucoef
+       Nudge_Vtau(:ncol,:pver,lchnk) =                             &
+       Nudge_Vtau(:ncol,:pver,lchnk) * Nudge_Vcoef
+       Nudge_Stau(:ncol,:pver,lchnk) =                             &
+       Nudge_Stau(:ncol,:pver,lchnk) * Nudge_Tcoef
+       Nudge_Qtau(:ncol,:pver,lchnk) =                             &
+       Nudge_Qtau(:ncol,:pver,lchnk) * Nudge_Qcoef
+       Nudge_PStau(:ncol,lchnk)=                             &
+       Nudge_PStau(:ncol,lchnk)* Nudge_PScoef
+    else
+      Nudge_Utau(:ncol,:pver,lchnk) =                             &
+      Nudge_Utau(:ncol,:pver,lchnk) * Nudge_Ucoef/float(Nudge_Step)
+      Nudge_Vtau(:ncol,:pver,lchnk) =                             &
+      Nudge_Vtau(:ncol,:pver,lchnk) * Nudge_Vcoef/float(Nudge_Step)
+      Nudge_Stau(:ncol,:pver,lchnk) =                             &
+      Nudge_Stau(:ncol,:pver,lchnk) * Nudge_Tcoef/float(Nudge_Step)
+      Nudge_Qtau(:ncol,:pver,lchnk) =                             &
+      Nudge_Qtau(:ncol,:pver,lchnk) * Nudge_Qcoef/float(Nudge_Step)
+      Nudge_PStau(:ncol,lchnk)=                             &
+      Nudge_PStau(:ncol,lchnk)* Nudge_PScoef/float(Nudge_Step)
+    endif
 
      Nudge_Ustep(:pcols,:pver,lchnk)=0._r8
      Nudge_Vstep(:pcols,:pver,lchnk)=0._r8
@@ -987,9 +1035,9 @@ contains
 
   !================================================================
   subroutine nudging_timestep_init(phys_state)
-   ! 
-   ! NUDGING_TIMESTEP_INIT: 
-   !                 Check the current time and update Model/Nudging 
+   !
+   ! NUDGING_TIMESTEP_INIT:
+   !                 Check the current time and update Model/Nudging
    !                 arrays when necessary. Toggle the Nudging flag
    !                 when the time is withing the nudging window.
    !===============================================================
@@ -1008,7 +1056,7 @@ contains
    ! Local values
    !----------------
    integer Year,Month,Day,Sec
-   integer YMD1,YMD2,YMD
+   integer YMD1,YMD2,YMD,YMD3,YMD4,YMD5,YMD6
    logical Update_Model,Update_Nudge,Sync_Error
    logical After_Beg   ,Before_End
    integer lchnk,ncol,indw
@@ -1018,7 +1066,11 @@ contains
    integer                 DeltaT
    real(r8)                Tscale
    real(r8)                Tfrac
+   real(r8)                r_gen !WEC
+   real(r8)                r_gen_switch !WEC
+   real(r8)                r_year !WEC
    integer                 rc
+   integer                 r_gen_floor
    integer                 nn
    integer                 kk
    real(r8)                Sbar,Qbar,Wsum
@@ -1038,16 +1090,19 @@ contains
    !--------------------
    call get_curr_date(Year,Month,Day,Sec)
    YMD=(Year*10000) + (Month*100) + Day
+   !write(iulog,*) 'YMD Flat ...',YMD,Sec
 
    !-------------------------------------------------------
    ! Determine if the current time is AFTER the begining time
    ! and if it is BEFORE the ending time.
    !-------------------------------------------------------
    YMD1=(Nudge_Beg_Year*10000) + (Nudge_Beg_Month*100) + Nudge_Beg_Day
+   !write(iulog,*) 'YMD1.1 ...',YMD1
    call timemgr_time_ge(YMD1,Nudge_Beg_Sec,         &
                         YMD ,Sec          ,After_Beg)
 
    YMD1=(Nudge_End_Year*10000) + (Nudge_End_Month*100) + Nudge_End_Day
+   !write(iulog,*) 'YMD1.2 ...',YMD1
    call timemgr_time_ge(YMD ,Sec,                    &
                         YMD1,Nudge_End_Sec,Before_End)
 
@@ -1057,6 +1112,8 @@ contains
    YMD1=(Model_Next_Year*10000) + (Model_Next_Month*100) + Model_Next_Day
    call timemgr_time_ge(YMD1,Model_Next_Sec,            &
                         YMD ,Sec           ,Update_Model)
+                        
+   !write(iulog,*) 'YMD1.3 ...',YMD1, Update_Model
 
    if((Before_End).and.(Update_Model)) then
      ! Increment the Model times by the current interval
@@ -1066,15 +1123,18 @@ contains
      Model_Curr_Day  =Model_Next_Day
      Model_Curr_Sec  =Model_Next_Sec
      YMD1=(Model_Curr_Year*10000) + (Model_Curr_Month*100) + Model_Curr_Day
+     !write(iulog,*) 'YMD1.4 pre ...',YMD1,Model_Next_Sec
      call timemgr_time_inc(YMD1,Model_Curr_Sec,              &
                            YMD2,Model_Next_Sec,Model_Step,0,0)
-
+     !write(iulog,*) 'YMD1.4 post ...',YMD2,Model_Next_Sec
      ! Check for Sync Error where NEXT model time after the update
-     ! is before the current time. If so, reset the next model 
+     ! is before the current time. If so, reset the next model
      ! time to a Model_Step after the current time.
      !--------------------------------------------------------------
      call timemgr_time_ge(YMD2,Model_Next_Sec,            &
                           YMD ,Sec           ,Sync_Error)
+                          
+     !write(iulog,*) 'YMD2.1 ...',YMD2,Model_Next_Sec
      if(Sync_Error) then
        Model_Curr_Year =Year
        Model_Curr_Month=Month
@@ -1119,44 +1179,131 @@ contains
                                  phys_state(lchnk)%phis,  Model_PS(:,lchnk), &
                                                   Model_S(:,:,lchnk), ncol)
        end do
-     endif 
+     endif
    endif ! ((Before_End).and.(Update_Model)) then
 
    !----------------------------------------------------------------
    ! When past the NEXT time, Update Nudging Arrays and time indices
    !----------------------------------------------------------------
    YMD1=(Nudge_Next_Year*10000) + (Nudge_Next_Month*100) + Nudge_Next_Day
+   !write(iulog,*) 'YMD1.5 ...',YMD1,Nudge_Next_Sec
    call timemgr_time_ge(YMD1,Nudge_Next_Sec,            &
                         YMD ,Sec           ,Update_Nudge)
 
    if((Before_End).and.(Update_Nudge)) then
      ! Increment the Nudge times by the current interval
      !---------------------------------------------------
+     !write(iulog,*) 'YMD1.6 ...',YMD1
+     
      Nudge_Curr_Year =Nudge_Next_Year
      Nudge_Curr_Month=Nudge_Next_Month
      Nudge_Curr_Day  =Nudge_Next_Day
      Nudge_Curr_Sec  =Nudge_Next_Sec
      YMD1=(Nudge_Curr_Year*10000) + (Nudge_Curr_Month*100) + Nudge_Curr_Day
+     
+     !write(iulog,*) 'YMD1.7 ...',YMD1
+     !write(iulog,*) 'YMD2.2 pre ...',YMD2,Nudge_Next_Sec
      call timemgr_time_inc(YMD1,Nudge_Curr_Sec,              &
                            YMD2,Nudge_Next_Sec,Nudge_Step,0,0)
+     !write(iulog,*) 'YMD2.2 post ...',YMD2,Nudge_Next_Sec
      Nudge_Next_Year =(YMD2/10000)
      YMD2            = YMD2-(Nudge_Next_Year*10000)
      Nudge_Next_Month=(YMD2/100)
      Nudge_Next_Day  = YMD2-(Nudge_Next_Month*100)
+     
+     !write(iulog,*) 'Current Nudging Stuff',Nudge_Next_Year,Nudge_Next_Month,Nudge_Next_Day,Nudge_Next_Sec,Nudge_Step,Model_Step
 
      ! Set the analysis filename at the NEXT time.
      !---------------------------------------------------------------
      Nudge_File=interpret_filename_spec(Nudge_File_Template      , &
-                                         yr_spec=Nudge_Next_Year , &
+                                         yr_spec=Nudge_Climo_Year , &
                                         mon_spec=Nudge_Next_Month, &
                                         day_spec=Nudge_Next_Day  , &
                                         sec_spec=Nudge_Next_Sec    )
+                                        
      if(masterproc) then
       write(iulog,*) 'NUDGING: Reading analyses:',trim(Nudge_Path)//trim(Nudge_File)
      endif
+    
+     !!!++WEC Grab a random file!
+     
+     
+     if(Memory_Rand.ge.5) then
+         call random_number(r_gen)
+         call random_number(r_gen_switch)
+         r_gen_floor = FLOOR(10*r_gen)
+         r_gen_switch = r_gen_switch-0.5
+          
+         if(r_gen_switch.ge.0) then
+             !write(iulog,*) 'Nudge Next Sec',Nudge_Next_Sec
+             !write(iulog,*) 'Switch positive',r_gen_switch
+             call timemgr_time_inc(YMD1,Nudge_Curr_Sec,              &
+                           YMD3,Random_Next_Sec,r_gen_floor*86400,0,0)
+             !write(iulog,*) 'Yogurt YMD3:',YMD3,r_gen,r_gen_floor
+             Random_Next_Year =(YMD3/10000)
+             YMD3            = YMD3-(Random_Next_Year*10000)
+             Random_Next_Month=(YMD3/100)
+             Random_Next_Day  = YMD3-(Random_Next_Month*100)
+         
+         
+             call random_number(r_year) 
+             Random_Next_Year = 2011+int((2019-2011 +1)*r_year)
+             !write(iulog,*) 'switch positive',Random_Next_Year,Random_Next_Month,Random_Next_Day,Random_Next_Sec
+             Ran_File=interpret_filename_spec(Nudge_File_Template      , &
+                                         yr_spec=Random_Next_Year , &
+                                        mon_spec=Random_Next_Month, &
+                                        day_spec=Random_Next_Day  , &
+                                        sec_spec=Nudge_Next_Sec    )
+             !write(iulog,*) 'random file positive',Ran_File
+         
+         else
+             !write(iulog,*) 'Nudge Next Sec',Nudge_Next_Sec
+             !write(iulog,*) 'Switch negative',r_gen_switch
+             call timemgr_time_inc_minus(YMD1,Nudge_Curr_Sec,              &
+                           YMD3,Random_Next_Sec,r_gen_floor*86400,0,0)
+             !write(iulog,*) 'Yogurt YMD3:',YMD3,r_gen,r_gen_floor
+             Random_Next_Year =(YMD3/10000)
+             YMD3            = YMD3-(Random_Next_Year*10000)
+             Random_Next_Month=(YMD3/100)
+             Random_Next_Day  = YMD3-(Random_Next_Month*100)
+             call random_number(r_year) 
+         
+             Random_Next_Year = 2011+int((2019-2011 +1)*r_year)
+             !write(iulog,*) 'switch negative',Random_Next_Year,Random_Next_Month,Random_Next_Day,Random_Next_Sec
+         
+             Ran_File=interpret_filename_spec(Nudge_File_Template      , &
+                                         yr_spec=Random_Next_Year , &
+                                        mon_spec=Random_Next_Month, &
+                                        day_spec=Random_Next_Day  , &
+                                        sec_spec=Nudge_Next_Sec    )
+                                       
+             !write(iulog,*) 'random file negative',Ran_File
+         endif
+         Memory_Rand = 1
+     else         
+         Memory_Rand=Memory_Rand+1
+         
+         
+         YMD5=(Random_Next_Year*10000) + (Random_Next_Month*100) + Random_Next_Day
+         
+         call timemgr_time_inc(YMD5,Nudge_Curr_Sec,              &
+                           YMD6,Random_Next_Sec,Nudge_Step,0,0)
+         Random_Next_Year =(YMD6/10000)
+         YMD6            = YMD6-(Random_Next_Year*10000)
+         Random_Next_Month=(YMD6/100)
+         Random_Next_Day  = YMD6-(Random_Next_Month*100)
+         Ran_File=interpret_filename_spec(Nudge_File_Template      , &
+                                         yr_spec=Random_Next_Year , &
+                                        mon_spec=Random_Next_Month, &
+                                        day_spec=Random_Next_Day  , &
+                                        sec_spec=Nudge_Next_Sec    )
+         !write(iulog,*) 'Increment Memory:',Memory_Rand
+         !write(iulog,*) 'Sustained Random file',Ran_File
+     endif
+     !!!++WEC Grab a random file! 
 
-     ! Rotate Nudge_ObsInd() indices for new data, then update 
-     ! the Nudge observation arrays with analysis data at the 
+     ! Rotate Nudge_ObsInd() indices for new data, then update
+     ! the Nudge observation arrays with analysis data at the
      ! NEXT==Nudge_ObsInd(1) time.
      !----------------------------------------------------------
      if(dycore_is('UNSTRUCTURED')) then
@@ -1169,7 +1316,7 @@ contains
    endif ! ((Before_End).and.(Update_Nudge)) then
 
    !----------------------------------------------------------------
-   ! Toggle Nudging flag when the time interval is between 
+   ! Toggle Nudging flag when the time interval is between
    ! beginning and ending times, and all of the analyses files exist.
    !----------------------------------------------------------------
    if((After_Beg).and.(Before_End)) then
@@ -1224,7 +1371,7 @@ contains
          Target_PS(:ncol     ,lchnk)=Nobs_PS(:ncol     ,lchnk,Nudge_ObsInd(1))
        end do
      elseif(Nudge_Force_Opt.eq.1) then
-       ! Target is linear interpolation of OBS data CURR<-->NEXT time    
+       ! Target is linear interpolation of OBS data CURR<-->NEXT time
        !---------------------------------------------------------------
        call ESMF_TimeSet(Date1,YY=Year,MM=Month,DD=Day,S=Sec)
        call ESMF_TimeSet(Date2,YY=Nudge_Next_Year,MM=Nudge_Next_Month, &
@@ -1270,7 +1417,7 @@ contains
        end do
      endif
 
-     ! Set Tscale for the specified Forcing Option 
+     ! Set Tscale for the specified Forcing Option
      !-----------------------------------------------
      if(Nudge_TimeScale_Opt.eq.0) then
        Tscale=1._r8
@@ -1288,7 +1435,9 @@ contains
 
      ! Update the nudging tendencies
      !--------------------------------
-     do lchnk=begchunk,endchunk
+     Nudge_Do=1 !Defined as integer above [WEC]
+     if(Nudge_Do==0) then
+     do lchnk=begchunk,endchunk !Remove:
        ncol=phys_state(lchnk)%ncol
        Nudge_Ustep(:ncol,:pver,lchnk)=(  Target_U(:ncol,:pver,lchnk)      &
                                          -Model_U(:ncol,:pver,lchnk))     &
@@ -1306,16 +1455,27 @@ contains
                                          -Model_PS(:ncol,lchnk))     &
                                       *Tscale*Nudge_PStau(:ncol,lchnk)
      end do
+     endif
 
+     if(Nudge_Do==1) then!ADDED BY [WEC]
+     do lchnk=begchunk,endchunk !Remove:
+       ncol=phys_state(lchnk)%ncol
+       Nudge_Ustep(:ncol,:pver,lchnk)=(Target_U(:ncol,:pver,lchnk))*Nudge_Utau(:ncol,:pver,lchnk) !These are all tendencies already [WEC]
+       Nudge_Vstep(:ncol,:pver,lchnk)=(Target_V(:ncol,:pver,lchnk))*Nudge_Vtau(:ncol,:pver,lchnk)
+       Nudge_Sstep(:ncol,:pver,lchnk)=(Target_S(:ncol,:pver,lchnk))*Nudge_Stau(:ncol,:pver,lchnk) !cant do Temp [WEC]
+       Nudge_Qstep(:ncol,:pver,lchnk)=(Target_Q(:ncol,:pver,lchnk))*Nudge_Qtau(:ncol,:pver,lchnk)
+       Nudge_PSstep(:ncol,     lchnk)=(Target_PS(:ncol,lchnk))*Nudge_PStau(:ncol,lchnk) !cant do PS [WEC]
+     end do
+     endif
      !******************
      ! DIAG
      !******************
 !    if(masterproc) then
-!      write(iulog,*) 'PFC: Target_T(1,:pver,begchunk)=',Target_T(1,:pver,begchunk)  
+!      write(iulog,*) 'PFC: Target_T(1,:pver,begchunk)=',Target_T(1,:pver,begchunk)
 !      write(iulog,*) 'PFC:  Model_T(1,:pver,begchunk)=',Model_T(1,:pver,begchunk)
-!      write(iulog,*) 'PFC: Target_S(1,:pver,begchunk)=',Target_S(1,:pver,begchunk)  
+!      write(iulog,*) 'PFC: Target_S(1,:pver,begchunk)=',Target_S(1,:pver,begchunk)
 !      write(iulog,*) 'PFC:  Model_S(1,:pver,begchunk)=',Model_S(1,:pver,begchunk)
-!      write(iulog,*) 'PFC:      Target_PS(1,begchunk)=',Target_PS(1,begchunk)  
+!      write(iulog,*) 'PFC:      Target_PS(1,begchunk)=',Target_PS(1,begchunk)
 !      write(iulog,*) 'PFC:       Model_PS(1,begchunk)=',Model_PS(1,begchunk)
 !      write(iulog,*) 'PFC: Nudge_Sstep(1,:pver,begchunk)=',Nudge_Sstep(1,:pver,begchunk)
 !      write(iulog,*) 'PFC: Nudge_Xstep arrays updated:'
@@ -1331,10 +1491,10 @@ contains
 
   !================================================================
   subroutine nudging_timestep_tend(phys_state,phys_tend)
-   ! 
-   ! NUDGING_TIMESTEP_TEND: 
-   !                If Nudging is ON, return the Nudging contributions 
-   !                to forcing using the current contents of the Nudge 
+   !
+   ! NUDGING_TIMESTEP_TEND:
+   !                If Nudging is ON, return the Nudging contributions
+   !                to forcing using the current contents of the Nudge
    !                arrays. Send output to the cam history module as well.
    !===============================================================
    use physconst    ,only: cpair
@@ -1358,7 +1518,7 @@ contains
    lq(indw)=.true.
    call physics_ptend_init(phys_tend,phys_state%psetcols,'nudging',lu=.true.,lv=.true.,ls=.true.,lq=lq)
 
-   if(Nudge_ON) then
+   if(Nudge_ON) then !this is where the nudging tendency gets teleported into the model. [WEC]
      lchnk=phys_state%lchnk
      ncol =phys_state%ncol
      phys_tend%u(:ncol,:pver)     =Nudge_Ustep(:ncol,:pver,lchnk)
@@ -1368,7 +1528,7 @@ contains
 
      call outfld( 'Nudge_U',phys_tend%u                ,pcols,lchnk)
      call outfld( 'Nudge_V',phys_tend%v                ,pcols,lchnk)
-     call outfld( 'Nudge_T',phys_tend%s/cpair          ,pcols,lchnk)
+     call outfld( 'Nudge_T',phys_tend%s/cpair          ,pcols,lchnk) !MUST EDIT TO MESS WITH T->DSE [WEC]
      call outfld( 'Nudge_Q',phys_tend%q(1,1,indw)      ,pcols,lchnk)
      call outfld('Target_U',Target_U(:,:,lchnk),pcols,lchnk)
      call outfld('Target_V',Target_V(:,:,lchnk),pcols,lchnk)
@@ -1385,9 +1545,9 @@ contains
 
   !================================================================
   subroutine nudging_update_analyses_se(anal_file)
-   ! 
-   ! NUDGING_UPDATE_ANALYSES_SE: 
-   !                 Open the given analyses data file, read in 
+   !
+   ! NUDGING_UPDATE_ANALYSES_SE:
+   !                 Open the given analyses data file, read in
    !                 U,V,T,Q, and PS values and then distribute
    !                 the values to all of the chunks.
    !===============================================================
@@ -1409,8 +1569,8 @@ contains
    real(r8) Lon_anal(Nudge_ncol)
    integer  nn,Nindex
 
-   ! Rotate Nudge_ObsInd() indices, then check the existence of the analyses 
-   ! file; broadcast the updated indices and file status to all the other MPI nodes. 
+   ! Rotate Nudge_ObsInd() indices, then check the existence of the analyses
+   ! file; broadcast the updated indices and file status to all the other MPI nodes.
    ! If the file is not there, then just return.
    !------------------------------------------------------------------------
    if(masterproc) then
@@ -1432,7 +1592,7 @@ contains
    ! masterporc does all of the work here
    !-----------------------------------------
    if(masterproc) then
-   
+
      ! Open the given file
      !-----------------------
      istat=nf90_open(trim(anal_file),NF90_NOWRITE,ncid)
@@ -1587,9 +1747,9 @@ contains
 
   !================================================================
   subroutine nudging_update_analyses_eul(anal_file)
-   ! 
-   ! NUDGING_UPDATE_ANALYSES_EUL: 
-   !                 Open the given analyses data file, read in 
+   !
+   ! NUDGING_UPDATE_ANALYSES_EUL:
+   !                 Open the given analyses data file, read in
    !                 U,V,T,Q, and PS values and then distribute
    !                 the values to all of the chunks.
    !===============================================================
@@ -1613,8 +1773,8 @@ contains
    real(r8) Xtrans(Nudge_nlon,Nudge_nlev,Nudge_nlat)
    integer  nn,Nindex
 
-   ! Rotate Nudge_ObsInd() indices, then check the existence of the analyses 
-   ! file; broadcast the updated indices and file status to all the other MPI nodes. 
+   ! Rotate Nudge_ObsInd() indices, then check the existence of the analyses
+   ! file; broadcast the updated indices and file status to all the other MPI nodes.
    ! If the file is not there, then just return.
    !------------------------------------------------------------------------
    if(masterproc) then
@@ -1634,7 +1794,7 @@ contains
    ! masterporc does all of the work here
    !-----------------------------------------
    if(masterproc) then
-   
+
      ! Open the given file
      !-----------------------
      istat=nf90_open(trim(anal_file),NF90_NOWRITE,ncid)
@@ -1708,7 +1868,7 @@ contains
       call endrun('nudging_update_analyses_eul: analyses dimension mismatch')
      endif
 
-     ! Read in, transpose lat/lev indices, 
+     ! Read in, transpose lat/lev indices,
      ! and scatter data arrays
      !----------------------------------
      istat=nf90_inq_varid(ncid,'U',varid)
@@ -1829,10 +1989,10 @@ contains
 
 
   !================================================================
-  subroutine nudging_update_analyses_fv(anal_file)
-   ! 
-   ! NUDGING_UPDATE_ANALYSES_FV: 
-   !                 Open the given analyses data file, read in 
+  subroutine nudging_update_analyses_fv(anal_file)!EDIT THIS [WEC]
+   !
+   ! NUDGING_UPDATE_ANALYSES_FV:
+   !                 Open the given analyses data file, read in
    !                 U,V,T,Q, and PS values and then distribute
    !                 the values to all of the chunks.
    !===============================================================
@@ -1856,8 +2016,8 @@ contains
    real(r8) Xtrans(Nudge_nlon,Nudge_nlev,Nudge_nlat)
    integer  nn,Nindex
 
-   ! Rotate Nudge_ObsInd() indices, then check the existence of the analyses 
-   ! file; broadcast the updated indices and file status to all the other MPI nodes. 
+   ! Rotate Nudge_ObsInd() indices, then check the existence of the analyses
+   ! file; broadcast the updated indices and file status to all the other MPI nodes.
    ! If the file is not there, then just return.
    !------------------------------------------------------------------------
    if(masterproc) then
@@ -1879,7 +2039,7 @@ contains
    ! masterporc does all of the work here
    !-----------------------------------------
    if(masterproc) then
-   
+
      ! Open the given file
      !-----------------------
      istat=nf90_open(trim(anal_file),NF90_NOWRITE,ncid)
@@ -1953,7 +2113,7 @@ contains
       call endrun('nudging_update_analyses_fv: analyses dimension mismatch')
      endif
 
-     ! Read in, transpose lat/lev indices, 
+     ! Read in, transpose lat/lev indices,
      ! and scatter data arrays
      !----------------------------------
      istat=nf90_inq_varid(ncid,'U',varid)
@@ -2075,7 +2235,7 @@ contains
 
   !================================================================
   subroutine nudging_set_profile(rlat,rlon,Nudge_prof,Wprof,nlev)
-   ! 
+   !
    ! NUDGING_SET_PROFILE: for the given lat,lon, and Nudging_prof, set
    !                      the verical profile of window coeffcients.
    !                      Values range from 0. to 1. to affect spatial
@@ -2109,7 +2269,7 @@ contains
      ! Localized Nudging with specified Heaviside window function
      !------------------------------------------------------------
      if(Nudge_Hwin_max.le.Nudge_Hwin_min) then
-       ! For a constant Horizontal window function, 
+       ! For a constant Horizontal window function,
        ! just set Hcoef to the maximum of Hlo/Hhi.
        !--------------------------------------------
        Hcoef=max(Nudge_Hwin_lo,Nudge_Hwin_hi)
@@ -2142,7 +2302,7 @@ contains
        lev_lo=(float(ilev)-Nudge_Vwin_Lindex)/Nudge_Vwin_Ldelta
        lev_hi=(Nudge_Vwin_Hindex-float(ilev))/Nudge_Vwin_Hdelta
        Wprof(ilev)=((1._r8+tanh(lev_lo))/2._r8)*((1._r8+tanh(lev_hi))/2._r8)
-     end do 
+     end do
 
      ! Scale the Window function to span the values between Vlo and Vhi:
      !-----------------------------------------------------------------
@@ -2150,7 +2310,7 @@ contains
      Vmin=minval(Wprof)
      if((Vmax.le.Vmin).or.((Nudge_Vwin_Hindex.ge.(nlev+1)).and. &
                            (Nudge_Vwin_Lindex.le. 0      )     )) then
-       ! For a constant Vertical window function, 
+       ! For a constant Vertical window function,
        ! load maximum of Vlo/Vhi into Wprof()
        !--------------------------------------------
        Vmax=max(Nudge_Vwin_lo,Nudge_Vwin_hi)
@@ -2162,7 +2322,7 @@ contains
        Wprof(:)=Nudge_Vwin_lo + Wprof(:)*(Nudge_Vwin_hi-Nudge_Vwin_lo)
      endif
 
-     ! The desired result is the product of the vertical profile 
+     ! The desired result is the product of the vertical profile
      ! and the horizontal window coeffcient.
      !----------------------------------------------------
      Wprof(:)=Hcoef*Wprof(:)
@@ -2179,7 +2339,7 @@ contains
 
   !================================================================
   real(r8) function nudging_set_PSprofile(rlat,rlon,Nudge_PSprof)
-   ! 
+   !
    ! NUDGING_SET_PSPROFILE: for the given lat and lon set the surface
    !                      pressure profile value for the specified index.
    !                      Values range from 0. to 1. to affect spatial
@@ -2218,9 +2378,9 @@ contains
 
   !================================================================
   subroutine calc_DryStaticEnergy(t, q, phis, ps, dse, ncol)
-   ! 
+   !
    ! calc_DryStaticEnergy: Given the temperature, specific humidity, surface pressure,
-   !                       and surface geopotential for a chunk containing 'ncol' columns, 
+   !                       and surface geopotential for a chunk containing 'ncol' columns,
    !                       calculate and return the corresponding dry static energy values.
    !--------------------------------------------------------------------------------------
    use shr_kind_mod, only: r8 => shr_kind_r8
@@ -2234,7 +2394,7 @@ contains
    integer , intent(in) :: ncol      ! Number of columns in chunk
    real(r8), intent(in) :: t(:,:)    ! (pcols,pver) - temperature
    real(r8), intent(in) :: q(:,:)    ! (pcols,pver) - specific humidity
-   real(r8), intent(in) :: ps(:)     ! (pcols)      - surface pressure 
+   real(r8), intent(in) :: ps(:)     ! (pcols)      - surface pressure
    real(r8), intent(in) :: phis(:)   ! (pcols)      - surface geopotential
    real(r8), intent(out):: dse(:,:)  ! (pcols,pver)  - dry static energy
    !
@@ -2254,7 +2414,7 @@ contains
    !-------------------
    fvdyn = dycore_is ('LR')
 
-   ! Load Pressure values and midpoint pressures 
+   ! Load Pressure values and midpoint pressures
    !----------------------------------------------
    do kk=1,pverp
      do ii=1,ncol
