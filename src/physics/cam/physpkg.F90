@@ -788,6 +788,9 @@ contains
 
     use ccpp_constituent_prop_mod, only: ccpp_const_props_init
 
+    !++WEC
+    use forpyex,            only: forpyex_init
+
     ! Input/output arguments
     type(physics_state), pointer       :: phys_state(:)
     type(physics_tend ), pointer       :: phys_tend(:)
@@ -996,6 +999,9 @@ contains
     ! Initialize the budget capability
     call cam_budget_init()
 
+    !WEC init forpyex
+    call forpyex_init
+
     ! addfld calls for U, V tendency budget variables that are output in
     ! tphysac, tphysbc
     call addfld ( 'UTEND_DCONV', (/ 'lev' /), 'A', 'm/s2', 'Zonal wind tendency by deep convection')
@@ -1086,6 +1092,7 @@ contains
     use spcam_drivers,  only: tphysbc_spcam
     use spmd_utils,     only: mpicom
     use physics_buffer, only: physics_buffer_desc, pbuf_get_chunk, pbuf_allocate
+
 #if (defined BFB_CAM_SCAM_IOP )
     use cam_history,    only: outfld
 #endif
@@ -1337,6 +1344,7 @@ contains
     use microp_aero, only : microp_aero_final
     use phys_grid_ctem, only : phys_grid_ctem_final
     use nudging, only: Nudge_Model, nudging_final
+    use forpyex, only : forpyex_finalize
 
     !-----------------------------------------------------------------------
     !
@@ -1366,7 +1374,7 @@ contains
         ! cleanup hemco
         call HCOI_Chunk_Final
     endif
-
+    call forpyex_finalize
   end subroutine phys_final
 
 
@@ -2089,6 +2097,7 @@ contains
     use cam_snapshot_common, only: cam_snapshot_ptend_outfld
     use ssatcontrail,       only: ssatcontrail_d0
     use dyn_tests_utils, only: vc_dycore
+    use forpyex,         only: forpyex_run
 
     ! Arguments
 
@@ -2848,6 +2857,8 @@ contains
     ! Moist physical parameteriztions complete:
     ! send dynamical variables, and derived variables to history file
     !===================================================
+
+    call forpyex_run() !++WEC
 
     call t_startf('bc_history_write')
     call diag_phys_writeout(state, pbuf)
