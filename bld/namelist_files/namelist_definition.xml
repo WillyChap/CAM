@@ -7677,6 +7677,66 @@ Default: set by build-namelist.
 </entry>
 
 <!-- ========================================================================================  -->
+<!-- Stochastic physics suite: -->
+<!-- ========================================================================================  -->
+<!-- Stochastically perturbed physics tendencies SPPT-->
+<entry id="cam_stoch_sppt" type="integer" category="cam_stoch"
+       group="cam_stoch_nl" valid_values="0,1" >
+Switch for stochastic parameter perturbations. Option at this point is
+0 = off, 1 = SPPT
+Default: set by build-namelist
+</entry>
+
+<entry id="cam_stoch_sppt_tau" type="real" category="cam_stoch"
+       group="cam_stoch_nl" valid_values="" >
+Temporal decorrelation time for stochastic pattern 
+</entry>
+
+<entry id="cam_stoch_sppt_sigma" type="real" category="cam_stoch"
+       group="cam_stoch_nl" valid_values="" >
+Gripoint standard deviation time for stochastic pattern 
+</entry>
+
+<entry id="cam_stoch_sppt_lengthscale" type="real" category="cam_stoch"
+       group="cam_stoch_nl" valid_values="" >
+Lengthscale for stochastic pattern
+</entry>
+
+<entry id="cam_stoch_sppt_cutoff" type="real" category="cam_stoch"
+       group="cam_stoch_nl" valid_values="" >
+Cutoff in sigma 
+</entry>
+
+<entry id="cam_stoch_sppt_seed" type="integer" category="cam_stoch"
+       group="cam_stoch_nl" valid_values="" >
+Seed for random number stream
+</entry>
+
+<!-- Stochastic kinetic energy backscatter -->
+
+<entry id="cam_stoch_skebs" type="integer" category="cam_stoch"
+       group="cam_stoch_nl" valid_values="0,1" >
+Switch for stochastic kinetic energy backscatter scheme. Option at this point is
+0 = off, 1 = SKEBS
+Default: set by build-namelist
+</entry>
+
+<entry id="cam_stoch_tot_backscat_psi" type="real" category="cam_stoch"
+       group="cam_stoch_nl" valid_values="" >
+Tuning parameter for streamfunction forcing in SKEBS
+</entry>
+
+<entry id="cam_stoch_tot_backscat_t" type="real" category="cam_stoch"
+       group="cam_stoch_nl" valid_values="" >
+Tuning parameter for temperature forcing in SKEBS
+</entry>
+
+<entry id="cam_stoch_skebs_seed" type="integer" category="cam_stoch"
+       group="cam_stoch_nl" valid_values="" >
+Seed for random number generator in cam_skebs_stoch
+</entry>
+
+<!-- ========================================================================================  -->
 <!-- physical constants: -->
 
 <entry id="sday" type="real" category="physconst"

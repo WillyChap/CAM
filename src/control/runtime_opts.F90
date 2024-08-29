@@ -90,11 +90,15 @@ subroutine read_namelist(nlfilename, single_column, scmlat, scmlon)
    use rate_diags,          only: rate_diags_readnl
    use tracers,             only: tracers_readnl
    use nudging,             only: nudging_readnl
+   !++WEC
+   !use stochaiing,             only: stochaiing_readnl
+   !++WEC
 
    use dyn_comp,            only: dyn_readnl
    use ionosphere_interface,only: ionosphere_readnl
    use qneg_module,         only: qneg_readnl
-   use upper_bc,            only: ubc_readnl
+!JDB and ABJ
+   use cam_stoch,           only: cam_stoch_readnl
 
    !---------------------------Arguments-----------------------------------
 
@@ -149,6 +153,7 @@ subroutine read_namelist(nlfilename, single_column, scmlat, scmlon)
    call uwshcu_readnl(nlfilename)
    call cld_sediment_readnl(nlfilename)
    call gw_drag_readnl(nlfilename)
+   call cam_stoch_readnl(nlfilename)
    call qbo_readnl(nlfilename)
    call iondrag_readnl(nlfilename)
    call waccmx_phys_ion_elec_temp_readnl(nlfilename)
@@ -186,12 +191,11 @@ subroutine read_namelist(nlfilename, single_column, scmlat, scmlon)
    call rate_diags_readnl(nlfilename)
    call scam_readnl(nlfilename, single_column, scmlat, scmlon)
    call nudging_readnl(nlfilename)
+   !call stochaiing_readnl(nlfilename)
 
    call dyn_readnl(nlfilename)
    call ionosphere_readnl(nlfilename)
    call qneg_readnl(nlfilename)
-
-   call ubc_readnl(nlfilename)
 
 end subroutine read_namelist
 

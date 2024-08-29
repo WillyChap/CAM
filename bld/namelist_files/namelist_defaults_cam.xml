@@ -1884,6 +1884,23 @@
 <cpl_seq_option >'CESM1_MOD_TIGHT'</cpl_seq_option>
 
 <!-- ================================================================== -->
+<!-- CAM stochastic physics                                             -->
+<!-- ================================================================== -->
+<!-- Stochastic kinetic energy backscatter SKEBS  -->
+<cam_stoch_skebs               >0 </cam_stoch_skebs>
+<cam_stoch_tot_backscat_psi    >0.0D0</cam_stoch_tot_backscat_psi>
+<cam_stoch_tot_backscat_t      >0.0D0</cam_stoch_tot_backscat_t>
+<cam_stoch_skebs_seed          >17</cam_stoch_skebs_seed>
+
+<!-- Stochasticially perturbed parameterization scheme SPPT -->
+<cam_stoch_sppt                >0 </cam_stoch_sppt>
+<cam_stoch_sppt_tau            >21600.0D0</cam_stoch_sppt_tau>
+<cam_stoch_sppt_sigma          >0.3D0</cam_stoch_sppt_sigma>
+<cam_stoch_sppt_lengthscale    >500000.0D0</cam_stoch_sppt_lengthscale>
+<cam_stoch_sppt_cutoff         >3.0D0</cam_stoch_sppt_cutoff>
+<cam_stoch_sppt_seed           >17</cam_stoch_sppt_seed>
+
+<!-- ================================================================== -->
 <!-- CAM specific surface model DOM                                     -->
 <!-- ================================================================== -->
 

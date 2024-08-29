@@ -9,6 +9,7 @@ module physpkg
   ! 2005-10-17  B. Eaton       Add contents of inti.F90 to phys_init().  Add
   !                            initialization of grid info in phys_state.
   ! Nov 2010    A. Gettelman   Put micro/macro physics into separate routines
+  ! Aug 2024    W. Chapman     added the stochastic physics stuff. 
   !-----------------------------------------------------------------------
 
   use shr_kind_mod,     only: r8 => shr_kind_r8
@@ -69,6 +70,12 @@ module physpkg
   integer ::  qini_idx           = 0
   integer ::  cldliqini_idx      = 0
   integer ::  cldiceini_idx      = 0
+!JDB
+  integer ::  tini_idx           = 0
+  integer ::  uini_idx           = 0
+  integer ::  vini_idx           = 0
+  integer ::  tend_rad_idx       = 0
+!JDB
 
   integer ::  prec_str_idx       = 0
   integer ::  snow_str_idx       = 0
@@ -81,6 +88,30 @@ module physpkg
   integer ::  prec_sh_idx        = 0
   integer ::  snow_sh_idx        = 0
   integer ::  dlfzm_idx          = 0     ! detrained convective cloud water mixing ratio.
+
+! JDB
+  integer ::  precini_str_idx
+  integer ::  precini_sed_idx
+  integer ::  precini_pcw_idx
+  integer ::  precini_dp_idx
+  integer ::  precini_sh_idx
+  integer ::  snowini_str_idx
+  integer ::  snowini_sed_idx
+  integer ::  snowini_pcw_idx
+  integer ::  snowini_dp_idx
+   integer ::  snowini_sh_idx
+ 
+  real(r8), pointer, dimension(:) :: precini_str
+  real(r8), pointer, dimension(:) :: precini_sed
+  real(r8), pointer, dimension(:) :: precini_pcw
+  real(r8), pointer, dimension(:) :: precini_dp
+  real(r8), pointer, dimension(:) :: precini_sh
+  real(r8), pointer, dimension(:) :: snowini_str
+  real(r8), pointer, dimension(:) :: snowini_sed
+  real(r8), pointer, dimension(:) :: snowini_pcw
+  real(r8), pointer, dimension(:) :: snowini_dp
+  real(r8), pointer, dimension(:) :: snowini_sh
+! end JDB
 
 !=======================================================================
 contains
@@ -98,7 +129,7 @@ contains
     !-----------------------------------------------------------------------
     use cam_abortutils,     only: endrun
     use physics_buffer,     only: pbuf_init_time
-    use physics_buffer,     only: pbuf_add_field, dtype_r8, pbuf_register_subcol
+    use physics_buffer,     only: pbuf_add_field, dtype_r8, pbuf_register_subcol, pbuf_get_index
     use shr_kind_mod,       only: r8 => shr_kind_r8
     use spmd_utils,         only: masterproc
     use constituents,       only: pcnst, cnst_add, cnst_chk_dim, cnst_name
@@ -124,6 +155,9 @@ contains
     use convect_shallow,    only: convect_shallow_register
     use radiation,          only: radiation_register
     use co2_cycle,          only: co2_register
+!JDB
+    use cam_stoch,          only: cam_stoch_register
+!JDB
     use flux_avg,           only: flux_avg_register
     use iondrag,            only: iondrag_register
     use waccmx_phys_intr,   only: waccmx_phys_ion_elec_temp_reg
@@ -153,6 +187,9 @@ contains
     integer  :: mm       ! constituent index
     integer  :: nmodes
     logical  :: has_fixed_ubc ! for upper bndy cond
+    !HMC
+    integer  :: idxerr   !error flag for pbuf_get_index
+    !HMC
     !-----------------------------------------------------------------------
 
     ! Get physics options
@@ -191,6 +228,100 @@ contains
     call pbuf_add_field('QINI',      'physpkg', dtype_r8, (/pcols,pver/), qini_idx)
     call pbuf_add_field('CLDLIQINI', 'physpkg', dtype_r8, (/pcols,pver/), cldliqini_idx)
     call pbuf_add_field('CLDICEINI', 'physpkg', dtype_r8, (/pcols,pver/), cldiceini_idx)
+
+!JDB
+    ! Fields needed for stoch phys 
+    call pbuf_add_field('TINI',     'physpkg', dtype_r8, (/pcols,pver/), tini_idx)
+    call pbuf_add_field('UINI',     'physpkg', dtype_r8, (/pcols,pver/), uini_idx)
+    call pbuf_add_field('VINI',     'physpkg', dtype_r8, (/pcols,pver/), vini_idx)
+    call pbuf_add_field('TEND_RAD', 'physpkg', dtype_r8, (/pcols,pver/), tend_rad_idx)
+
+!In file "/glade/work/hannahc/cesm1_1_2_LENS_n16/runs/amip05_F1850LENS_f09_f09_spptend_chey/SourceMods/src.cam/physpkg.F90":
+!------------------------------
+
+    !HMC want to find out if we have already registered and populated 
+    precini_str_idx = pbuf_get_index('PRECINI_STR',idxerr)
+    if (idxerr.lt.0) then
+       precini_str_idx = 0
+       call pbuf_add_field('PRECINI_STR',      'global', dtype_r8, (/pcols/), precini_str_idx)
+       !call pbuf_get_field(pbuf, precini_str_idx, precini_str)
+       !precini_str = 0.0_r8
+    endif
+
+    precini_sed_idx = pbuf_get_index('PRECINI_SED',idxerr)
+    if (idxerr.lt.0) then
+       precini_sed_idx = 0
+       call pbuf_add_field('PRECINI_SED',      'global', dtype_r8, (/pcols/), precini_sed_idx)
+       !call pbuf_get_field(pbuf, precini_sed_idx, precini_sed)
+       !precini_sed = 0.0_r8
+    endif
+    
+    precini_pcw_idx = pbuf_get_index('PRECINI_PCW',idxerr)
+    if (idxerr.lt.0) then
+       precini_pcw_idx = 0
+       call pbuf_add_field('PRECINI_PCW',      'global', dtype_r8, (/pcols/), precini_pcw_idx)
+       !call pbuf_get_field(pbuf, precini_pcw_idx, precini_pcw)
+       !precini_pcw = 0.0_r8
+    endif
+    
+    precini_dp_idx = pbuf_get_index('PRECINI_DP',idxerr)
+    if (idxerr.lt.0) then
+       precini_dp_idx = 0
+       call pbuf_add_field('PRECINI_DP',      'global', dtype_r8, (/pcols/), precini_dp_idx)
+       !call pbuf_get_field(pbuf, precini_dp_idx, precini_dp)
+       !precini_dp = 0.0_r8
+    endif
+    
+    precini_sh_idx = pbuf_get_index('PRECINI_SH',idxerr)
+    if (idxerr.lt.0) then
+       precini_sh_idx = 0
+       call pbuf_add_field('PRECINI_SH',      'global', dtype_r8, (/pcols/), precini_sh_idx)
+       !call pbuf_get_field(pbuf, precini_sh_idx, precini_sh)
+       !precini_sh = 0.0_r8
+    endif
+    
+    snowini_str_idx = pbuf_get_index('SNOWINI_STR',idxerr)
+    if (idxerr.lt.0) then
+       snowini_str_idx = 0
+       call pbuf_add_field('SNOWINI_STR',      'global', dtype_r8, (/pcols/), snowini_str_idx)
+       !call pbuf_get_field(pbuf, snowini_str_idx, snowini_str)
+       !snowini_str = 0.0_r8
+    endif
+
+    snowini_sed_idx = pbuf_get_index('SNOWINI_SED',idxerr)
+    if (idxerr.lt.0) then
+       snowini_sed_idx = 0
+       call pbuf_add_field('SNOWINI_SED',      'global', dtype_r8, (/pcols/), snowini_sed_idx)
+       !call pbuf_get_field(pbuf, snowini_sed_idx, snowini_sed)
+       !snowini_sed = 0.0_r8
+    endif
+
+    snowini_pcw_idx = pbuf_get_index('SNOWINI_PCW',idxerr)
+    if (idxerr.lt.0) then
+       snowini_pcw_idx = 0
+       call pbuf_add_field('SNOWINI_PCW',      'global', dtype_r8, (/pcols/), snowini_pcw_idx)
+       !call pbuf_get_field(pbuf, snowini_pcw_idx, snowini_pcw)
+       !snowini_pcw = 0.0_r8
+    endif
+
+    snowini_dp_idx = pbuf_get_index('SNOWINI_DP',idxerr)
+    if (idxerr.lt.0) then
+       snowini_dp_idx = 0
+       call pbuf_add_field('SNOWINI_DP',      'global', dtype_r8, (/pcols/), snowini_dp_idx)
+       !call pbuf_get_field(pbuf, snowini_dp_idx, snowini_dp)
+       !snowini_dp = 0.0_r8
+    endif
+
+    snowini_sh_idx = pbuf_get_index('SNOWINI_SH',idxerr)
+    if (idxerr.lt.0) then
+       snowini_sh_idx = 0
+       call pbuf_add_field('SNOWINI_SH',      'global', dtype_r8, (/pcols/), snowini_sh_idx)
+       !call pbuf_get_field(pbuf, snowini_sh_idx, snowini_sh)
+       !snowini_sh = 0.0_r8
+    endif
+    !end HMC
+! end JDB 
+!JDB
 
     ! check energy package
     call check_energy_register
@@ -253,6 +384,10 @@ contains
 
        ! co2 constituents
        call co2_register()
+!WEC 
+       ! Register stochastic perturbations
+       call cam_stoch_register()
+!WEC 
 
        ! register data model ozone with pbuf
        if (cam3_ozone_data_on) then
@@ -745,7 +880,9 @@ contains
     use dadadj_cam,         only: dadadj_init
     use cam_abortutils,     only: endrun
     use nudging,            only: Nudge_Model, nudging_init
-
+!JDB
+    use cam_stoch,          only: cam_stoch_skebs_init, cam_stoch_sppt_init, cam_stoch_conv_init,cam_stoch_sppt
+!JDB
     ! Input/output arguments
     type(physics_state), pointer       :: phys_state(:)
     type(physics_tend ), pointer       :: phys_tend(:)
@@ -930,6 +1067,14 @@ contains
 
     ! Initialize qneg3 and qneg4
     call qneg_init()
+!JDB
+   ! initialize stochastic physics suite in any case, then control components with with cam_stoch_xxx
+   !call cam_stoch_conv_init(pbuf2d)
+   if (cam_stoch_sppt.eq.1) then
+       call cam_stoch_sppt_init(pbuf2d)
+   end if
+   !call cam_stoch_skebs_init(pbuf2d)
+!JDB
 
   end subroutine phys_init
 
@@ -1272,6 +1417,17 @@ contains
     use qneg_module,        only: qneg4
     use co2_cycle,          only: co2_cycle_set_ptend
     use nudging,            only: Nudge_Model,Nudge_ON,nudging_timestep_tend
+! JDB 
+    use cam_stoch,       only: cam_stoch_sppt, stoch_sppt_idx, ptend_update_sppt
+    use cam_stoch,       only: cam_stoch_skebs
+    use cam_history,     only: outfld
+    real(r8), pointer                 :: rstoch_sppt(:)  ! (pcols) 
+    real(r8), pointer, dimension(:,:) :: tend_rad  ! (pcols,pver)
+    real(r8), pointer, dimension(:,:) :: uini
+    real(r8), pointer, dimension(:,:) :: vini
+    real(r8), pointer, dimension(:,:) :: tini
+    real(r8)                          :: tend_q_dt(pcols,pver) ! backed out q tendency
+! JDB 
 
     !
     ! Arguments
@@ -1315,6 +1471,8 @@ contains
     real(r8) :: tmp_trac  (pcols,pver,pcnst) ! tmp space
     real(r8) :: tmp_pdel  (pcols,pver) ! tmp space
     real(r8) :: tmp_ps    (pcols)      ! tmp space
+!WEC
+    real(r8) :: tend_dtdt_perturb(pcols,pver)   ! tmp space
 
     ! physics buffer fields for total energy and mass adjustment
     integer itim_old, ifld
@@ -1325,6 +1483,19 @@ contains
     real(r8), pointer, dimension(:,:) :: cldiceini
     real(r8), pointer, dimension(:,:) :: dtcore
     real(r8), pointer, dimension(:,:) :: ast     ! relative humidity cloud fraction
+
+!JDB 
+    real(r8), pointer, dimension(:) :: precini_str
+    real(r8), pointer, dimension(:) :: precini_sed
+    real(r8), pointer, dimension(:) :: precini_pcw
+    real(r8), pointer, dimension(:) :: precini_dp
+    real(r8), pointer, dimension(:) :: precini_sh
+    real(r8), pointer, dimension(:) :: snowini_str
+    real(r8), pointer, dimension(:) :: snowini_sed
+    real(r8), pointer, dimension(:) :: snowini_pcw
+    real(r8), pointer, dimension(:) :: snowini_dp
+    real(r8), pointer, dimension(:) :: snowini_sh
+!end JDB 
 
     !-----------------------------------------------------------------------
     lchnk = state%lchnk
@@ -1352,6 +1523,12 @@ contains
     call pbuf_get_field(pbuf, qini_idx, qini)
     call pbuf_get_field(pbuf, cldliqini_idx, cldliqini)
     call pbuf_get_field(pbuf, cldiceini_idx, cldiceini)
+
+!JDB
+    call pbuf_get_field(pbuf, uini_idx, uini)
+    call pbuf_get_field(pbuf, vini_idx, vini)
+    call pbuf_get_field(pbuf, tini_idx, tini)
+!JDB
 
     ifld = pbuf_get_index('CLD')
     call pbuf_get_field(pbuf, ifld, cld, start=(/1,1,itim_old/),kount=(/pcols,pver,1/))
@@ -1546,6 +1723,115 @@ contains
       call physics_update(state,ptend,ztodt,tend)
       call check_energy_chng(state, tend, "nudging", nstep, ztodt, zero, zero, zero, zero)
     endif
+    !++WEC
+    ! Update Stochai values, if needed
+    !----------------------------------
+    
+    !if((Stochai_Model).and.(Stochai_ON)) then
+    !  call stochaiing_timestep_tend(state,ptend)
+    !  call physics_update(state,ptend,ztodt,tend)
+    !  call check_energy_chng(state, tend, "stochaiing", nstep, ztodt, zero, zero, zero, zero)
+    !endif
+    !--WEC
+    
+!JDB
+!===================================================
+! Stochastic parameterization SKEBS 
+!===================================================
+!    if (cam_stoch_skebs==1) then
+!       call t_startf('stochastic_skebs')
+!       call ptend_update_skebs(pbuf,state,ncol,lchnk,rstoch_skebs) ! needs to be called before 1st physics_update 
+!       call t_stopf('stochastic_skebs')
+!    endif 
+
+!===================================================
+! Stochastic parameterization SPPT 
+!===================================================
+       call t_startf('stochastic_sppt')
+
+    if (cam_stoch_sppt.eq.1) then
+        call ptend_update_sppt(pbuf,ncol,lchnk)  ! puts global field in rstoch_sppt, doesn't use it
+        call pbuf_get_field(pbuf, stoch_sppt_idx, rstoch_sppt) ! no need to get rstoch_sppt here
+        call pbuf_get_field(pbuf, tend_rad_idx, tend_rad)
+        !Q tendency not stored so back it out
+        !do k = ptend%top_level, ptend%bot_level
+        do k = 1,pver  !! ptend%top_level, ptend%bot_level
+           do i = 1, ncol
+              tend_q_dt(i,k) = state%q(i,k,1)-qini(i,k)
+          end do
+        end do
+        call outfld('RSTOCH_SPPT',rstoch_sppt, pcols, lchnk)
+        !call outfld('TEND_RAD',tend_rad(:ncol,:), pcols, lchnk)
+        ! Apply SPPT perturbation to tendency before adding to state. Don't perturb radiation.
+        !  rstoch_sppt is bound in camstoch as to not revert the sign of tendencies :
+        !       e.g. tend%dvdt *(1._r8+rstoch_sppt(i)) is between 0 and 2* tend%dvdt
+         do k = 1,pver  !! ptend%top_level, ptend%bot_level
+            do i = 1, ncol
+               !tend_dtdt_perturb(i,k) = (tend%dtdt(i,k)-tend_rad(i,k))  * rstoch_sppt(i)
+               tend_dtdt_perturb(i,k) = (tend%dtdt(i,k))  * rstoch_sppt(i)
+            enddo
+         enddo
+         ! Cutoff perturbations of more than +/- tend%dtdt
+         do k = 1,pver
+            do i = 1, ncol
+               if  (abs(tend_dtdt_perturb(i,k))>abs(tend%dtdt(i,k)) )  then
+                  tend_dtdt_perturb(i,k)=tend%dtdt(i,k)
+               endif
+            enddo
+         enddo
+         do k = 1,pver
+            do i = 1, ncol
+                !state%t(i,k)   = tini(i,k) + ztodt * tend%dtdt(i,k)             * (1._r8+rstoch_sppt(i))
+                state%t(i,k)   = tini(i,k) + ztodt * tend%dtdt(i,k)     + ztodt * tend_dtdt_perturb(i,k)
+                state%u(i,k)   = uini(i,k) + ztodt * tend%dudt(i,k)             * (1._r8+rstoch_sppt(i))
+                state%v(i,k)   = vini(i,k) + ztodt * tend%dvdt(i,k)             * (1._r8+rstoch_sppt(i))
+                state%q(i,k,1) = qini(i,k) +         tend_q_dt(i,k)             * (1._r8+rstoch_sppt(i))
+           end do
+         end do
+        !print*,'new',state%t(20,10),state%u(20,10),state%v(20,10),state%q(20,10,1)
+        !print*,'newtend',tend%dtdt(20,10)* (1._r8+rstoch_sppt(i)),tend%dudt(20,10)*(1._r8+rstoch_sppt(i)),tend%dvdt(20,10)*(1._r8+rstoch_sppt(i)),tend_q_dt(20,10)* (1._r8+rstoch_sppt(i))
+       call t_stopf('stochastic_sppt')
+
+
+!In file "amip05_F1850LENS_f09_f09_spptend_chey/SourceMods/src.cam/physpkg.F90":
+!------------------------------
+ 
+        !SPPT precip perturbations
+!        !calculate perturbed precipitation and save for use in physbc at next timestep
+        call pbuf_get_field(pbuf, precini_str_idx, precini_str)
+        call pbuf_get_field(pbuf, precini_sed_idx, precini_sed)
+        call pbuf_get_field(pbuf, precini_pcw_idx, precini_pcw)
+        call pbuf_get_field(pbuf, precini_dp_idx , precini_dp)
+        call pbuf_get_field(pbuf, precini_sh_idx , precini_sh)
+        call pbuf_get_field(pbuf, snowini_str_idx, snowini_str)
+        call pbuf_get_field(pbuf, snowini_sed_idx, snowini_sed)
+        call pbuf_get_field(pbuf, snowini_pcw_idx, snowini_pcw)
+        call pbuf_get_field(pbuf, snowini_dp_idx , snowini_dp)
+        call pbuf_get_field(pbuf, snowini_sh_idx , snowini_sh)
+        ! replace with delta PREC
+        do i = 1,ncol
+           ! N.b. evaporative flux is cam_in%cflx(:,1)
+           ! but not clear how to include this, since we have such a distibuted precipitation here
+           precini_str(i) = rstoch_sppt(i)*precini_str(i)
+           precini_sed(i) = rstoch_sppt(i)*precini_sed(i)
+           precini_pcw(i) = rstoch_sppt(i)*precini_pcw(i)
+           precini_dp(i)  = rstoch_sppt(i)*precini_dp(i)
+           precini_sh(i)  = rstoch_sppt(i)*precini_sh(i)
+           snowini_str(i) = rstoch_sppt(i)*snowini_str(i)
+           snowini_sed(i) = rstoch_sppt(i)*snowini_sed(i)
+           snowini_pcw(i) = rstoch_sppt(i)*snowini_pcw(i)
+           snowini_dp(i)  = rstoch_sppt(i)*snowini_dp(i)
+           snowini_sh(i)  = rstoch_sppt(i)*snowini_sh(i)
+        end do
+ 
+        !WRITE(*,'('' HMCHMC physac SPPT nstep ='',I5.4)') nstep
+        !WRITE(*,'('' HMCHMC physac SPPT dprec ='',E12.5)') precini_dp(1)
+    endif
+
+!===================================================
+! JDB
+
+
 
     !-------------- Energy budget checks vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 
@@ -1612,6 +1898,7 @@ contains
        dtcore(:ncol,k) = state%t(:ncol,k)
     end do
 
+
     !-------------- Energy budget checks ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
     if (aqua_planet) then
@@ -1661,7 +1948,7 @@ contains
     !
     !-----------------------------------------------------------------------
 
-    use physics_buffer,  only: physics_buffer_desc, pbuf_get_field
+    use physics_buffer,  only: physics_buffer_desc, pbuf_get_field, pbuf_set_field
     use physics_buffer,  only: pbuf_get_index, pbuf_old_tim_idx
     use physics_buffer,  only: col_type_subcol, dyn_time_lvls
     use shr_kind_mod,    only: r8 => shr_kind_r8
@@ -1700,6 +1987,9 @@ contains
     use subcol,          only: subcol_gen, subcol_ptend_avg
     use subcol_utils,    only: subcol_ptend_copy, is_subcol_on
     use qneg_module,     only: qneg3
+!JDB
+    use cam_stoch,          only: cam_stoch_sppt
+!JDB
 
     ! Arguments
 
@@ -1741,6 +2031,9 @@ contains
     integer ncol                               ! number of atmospheric columns
 
     integer :: i                               ! column indicex
+! JDB
+    integer :: idx,k
+! end JDB
     integer :: ixcldice, ixcldliq              ! constituent indices for cloud liquid and ice water.
     ! for macro/micro co-substepping
     integer :: macmic_it                       ! iteration variables
@@ -1756,6 +2049,37 @@ contains
     real(r8), pointer, dimension(:,:) :: cldliqini
     real(r8), pointer, dimension(:,:) :: cldiceini
     real(r8), pointer, dimension(:,:) :: dtcore
+! JDB
+    real(r8), pointer, dimension(:,:) :: uini
+    real(r8), pointer, dimension(:,:) :: vini
+    real(r8), pointer, dimension(:,:) :: tini
+    real(r8), pointer, dimension(:,:) :: tend_rad
+
+! In file "amip05_F1850LENS_f09_f09_spptend_chey/SourceMods/src.cam/physpkg.F90":
+!------------------------------
+     real(r8), pointer, dimension(:) :: precini_str !HMC - prec saved for SPPT next t-step
+     real(r8), pointer, dimension(:) :: precini_sed !HMC - prec saved for SPPT next t-step
+     real(r8), pointer, dimension(:) :: precini_pcw !HMC - prec saved for SPPT next t-step
+     real(r8), pointer, dimension(:) :: precini_dp  !HMC - prec saved for SPPT next t-step
+     real(r8), pointer, dimension(:) :: precini_sh  !HMC - prec saved for SPPT next t-step
+     real(r8), pointer, dimension(:) :: snowini_str !HMC - snow saved for SPPT next t-step
+     real(r8), pointer, dimension(:) :: snowini_sed !HMC - snow saved for SPPT next t-step
+     real(r8), pointer, dimension(:) :: snowini_pcw !HMC - snow saved for SPPT next t-step
+     real(r8), pointer, dimension(:) :: snowini_dp  !HMC - snow saved for SPPT next t-step
+     real(r8), pointer, dimension(:) :: snowini_sh  !HMC - snow saved for SPPT next t-step
+ 
+     real(r8)  :: preclst_str(pcols) !HMC - prec saved from SPPT last t-step
+     real(r8)  :: preclst_sed(pcols) !HMC - prec saved from SPPT last t-step
+     real(r8)  :: preclst_pcw(pcols) !HMC - prec saved from SPPT last t-step
+     real(r8)  :: preclst_dp(pcols)  !HMC - prec saved from SPPT last t-step
+     real(r8)  :: preclst_sh(pcols)  !HMC - prec saved from SPPT last t-step
+     real(r8)  :: snowlst_str(pcols) !HMC - snow saved from SPPT last t-step
+     real(r8)  :: snowlst_sed(pcols) !HMC - snow saved from SPPT last t-step
+     real(r8)  :: snowlst_pcw(pcols) !HMC - snow saved from SPPT last t-step
+     real(r8)  :: snowlst_dp(pcols)  !HMC - snow saved from SPPT last t-step
+     real(r8)  :: snowlst_sh(pcols)  !HMC - snow saved from SPPT last t-step
+ 
+! JDB
 
     real(r8), pointer, dimension(:,:,:) :: fracis  ! fraction of transported species that are insoluble
 
@@ -1828,6 +2152,13 @@ contains
     ifld   =  pbuf_get_index('DTCORE')
     call pbuf_get_field(pbuf, ifld, dtcore, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
 
+!JDB
+    call pbuf_get_field(pbuf, uini_idx, uini)!,(/1,1,itim_old/),(/pcols,pver,1/))
+    call pbuf_get_field(pbuf, vini_idx, vini)!,(/1,1,itim_old/),(/pcols,pver,1/))
+    call pbuf_get_field(pbuf, tini_idx, tini)!,(/1,1,itim_old/),(/pcols,pver,1/))
+    call pbuf_get_field(pbuf, tend_rad_idx, tend_rad)!,(/1,1,itim_old/),(/pcols,pver,1/))
+! end JDB
+
     ifld    = pbuf_get_index('FRACIS')
     call pbuf_get_field(pbuf, ifld, fracis, start=(/1,1,1/), kount=(/pcols, pver, pcnst/)  )
     fracis (:ncol,:,1:pcnst) = 1._r8
@@ -1896,6 +2227,77 @@ contains
     end if
 
     call t_stopf('energy_fixer')
+
+!JDB
+!   ========================================================
+!   Stochastically perturbed parametrisation tendencies
+!   ========================================================
+!   save uini and vini
+    if (cam_stoch_sppt.eq.1) then
+    uini(:ncol,:pver) = state%u(:ncol,:pver)
+    vini(:ncol,:pver) = state%v(:ncol,:pver)
+    tini(:ncol,:pver) = state%t(:ncol,:pver)
+    call pbuf_set_field(pbuf, uini_idx, uini)!, (/1,itim_old/),(/pcols,1/))
+    call pbuf_set_field(pbuf, vini_idx, vini)!, (/1,itim_old/),(/pcols,1/))
+    call pbuf_set_field(pbuf, tini_idx, tini,   (/1,itim_old/),(/pcols,1/))
+
+
+! file "amip05_F1850LENS_f09_f09_spptend_chey/SourceMods/src.cam/physpkg.F90
+!------------------------------
+     !--HMC precipitation perturbations
+     !if nstep==0 (first step), initialise precini to zero
+     if (nstep.eq.0) then
+        call pbuf_get_field(pbuf, precini_str_idx, precini_str)
+        precini_str = 0.0_r8
+        call pbuf_get_field(pbuf, precini_sed_idx, precini_sed)
+        precini_sed = 0.0_r8
+        call pbuf_get_field(pbuf, precini_pcw_idx, precini_pcw)
+        precini_pcw = 0.0_r8
+        call pbuf_get_field(pbuf, precini_dp_idx, precini_dp)
+        precini_dp = 0.0_r8
+        call pbuf_get_field(pbuf, precini_sh_idx, precini_sh)
+        precini_sh = 0.0_r8
+        call pbuf_get_field(pbuf, snowini_str_idx, snowini_str)
+        snowini_str = 0.0_r8
+        call pbuf_get_field(pbuf, snowini_sed_idx, snowini_sed)
+        snowini_sed = 0.0_r8
+        call pbuf_get_field(pbuf, snowini_pcw_idx, snowini_pcw)
+        snowini_pcw = 0.0_r8
+        call pbuf_get_field(pbuf, snowini_dp_idx, snowini_dp)
+        snowini_dp = 0.0_r8
+        call pbuf_get_field(pbuf, snowini_sh_idx, snowini_sh)
+        snowini_sh = 0.0_r8
+        call pbuf_get_field(pbuf, tend_rad_idx, tend_rad)
+        tend_rad = 0.0_r8
+     else
+        !get prec ini fields from buffer (point to right place)
+        call pbuf_get_field(pbuf, precini_str_idx, precini_str)
+        call pbuf_get_field(pbuf, precini_sed_idx, precini_sed)
+        call pbuf_get_field(pbuf, precini_pcw_idx, precini_pcw)
+        call pbuf_get_field(pbuf, precini_dp_idx , precini_dp)
+        call pbuf_get_field(pbuf, precini_sh_idx , precini_sh)
+        call pbuf_get_field(pbuf, snowini_str_idx, snowini_str)
+        call pbuf_get_field(pbuf, snowini_sed_idx, snowini_sed)
+        call pbuf_get_field(pbuf, snowini_pcw_idx, snowini_pcw)
+        call pbuf_get_field(pbuf, snowini_dp_idx , snowini_dp)
+        call pbuf_get_field(pbuf, snowini_sh_idx , snowini_sh)
+     endif
+ 
+     !move precini from last time step into preclst
+     preclst_str(:ncol) = precini_str(:ncol)
+     preclst_sed(:ncol) = precini_sed(:ncol)
+     preclst_pcw(:ncol) = precini_pcw(:ncol)
+     preclst_dp(:ncol)  = precini_dp(:ncol)
+     preclst_sh(:ncol)  = precini_sh(:ncol)
+     snowlst_str(:ncol) = snowini_str(:ncol)
+     snowlst_sed(:ncol) = snowini_sed(:ncol)
+     snowlst_pcw(:ncol) = snowini_pcw(:ncol)
+     snowlst_dp(:ncol)  = snowini_dp(:ncol)
+     snowlst_sh(:ncol)  = snowini_sh(:ncol)
+     !--end HMC
+     end if
+
+!JDB
     !
     !===================================================
     ! Dry adjustment
@@ -2241,6 +2643,53 @@ contains
        call t_stopf('bc_aerosols')
 
    endif
+   
+   !===================================================
+     ! HMC SPPT precip perturbations for moisture conservation
+     ! - here, the moist parametrisations which procude PREC have finished
+     ! - save this prec to precini for future info
+     ! - then update prec with Dprec from SPPT at prev timestep
+     !===================================================
+     precini_str(:ncol) = prec_str(:ncol)
+     precini_sed(:ncol) = prec_sed(:ncol)
+     precini_pcw(:ncol) = prec_pcw(:ncol)
+     precini_dp(:ncol)  = prec_dp(:ncol)
+     precini_sh(:ncol)  = prec_sh(:ncol)
+     snowini_str(:ncol) = snow_str(:ncol)
+     snowini_sed(:ncol) = snow_sed(:ncol)
+     snowini_pcw(:ncol) = snow_pcw(:ncol)
+     snowini_dp(:ncol)  = snow_dp(:ncol)
+     snowini_sh(:ncol)  = snow_sh(:ncol)
+ 
+     prec_str(:ncol) = prec_str(:ncol) + preclst_str(:ncol)
+     prec_sed(:ncol) = prec_sed(:ncol) + preclst_sed(:ncol)
+     prec_pcw(:ncol) = prec_pcw(:ncol) + preclst_pcw(:ncol)
+     prec_dp(:ncol)  = prec_dp(:ncol)  + preclst_dp(:ncol)
+     prec_sh(:ncol)  = prec_sh(:ncol)  + preclst_sh(:ncol)
+     snow_str(:ncol) = snow_str(:ncol) + snowlst_str(:ncol)
+     snow_sed(:ncol) = snow_sed(:ncol) + snowlst_sed(:ncol)
+     snow_pcw(:ncol) = snow_pcw(:ncol) + snowlst_pcw(:ncol)
+     snow_dp(:ncol)  = snow_dp(:ncol)  + snowlst_dp(:ncol)
+     snow_sh(:ncol)  = snow_sh(:ncol)  + snowlst_sh(:ncol)
+ 
+     !WRITE(*,'('' HMC physbc SPPT nstep ='',I5.4)') nstep
+     !WRITE(*,'('' HMC physbc SPPT nstep; dprec; Bprec; Aprec ='',I5.4,'' '',E12.5,'' '',E12.5,'' '',E12.5)') nstep, MAXVAL(preclst_dp), MAXVAL(precini_dp), MAXVAL(prec_dp)
+ 
+     !HMC do not allow prec to be negative
+     do idx = 1,ncol
+         prec_str(idx) = max(prec_str(idx),0.0)
+         prec_sed(idx) = max(prec_sed(idx),0.0)
+         prec_pcw(idx) = max(prec_pcw(idx),0.0)
+         prec_dp(idx)  = max(prec_dp(idx),0.0)
+         prec_sh(idx)  = max(prec_sh(idx),0.0)
+         snow_str(idx) = max(snow_str(idx),0.0)
+         snow_sed(idx) = max(snow_sed(idx),0.0)
+         snow_pcw(idx) = max(snow_pcw(idx),0.0)
+         snow_dp(idx)  = max(snow_dp(idx),0.0)
+         snow_sh(idx)  = max(snow_sh(idx),0.0)
+     end do
+     !WRITE(*,'('' HMC physbc SPPT A+prec='',I5.4,'' '',E12.5)') nstep, prec_dp(1)
+
 
     !===================================================
     ! Moist physical parameteriztions complete:
@@ -2273,10 +2722,31 @@ contains
        state, ptend, pbuf, cam_out, cam_in, net_flx)
 
     ! Set net flux used by spectral dycores
+    if (cam_stoch_sppt.eq.1) then
     do i=1,ncol
        tend%flx_net(i) = net_flx(i)
     end do
+! JDB save radiation tendency
+       do k = 1,pver
+           do i = 1, ncol
+              tend_rad(i,k) = tend%dtdt(i,k)
+          end do
+        end do
     call physics_update(state, ptend, ztodt, tend)
+       do k = 1,pver
+           do i = 1, ncol
+              tend_rad(i,k) =  tend%dtdt(i,k) -  tend_rad(i,k)
+          end do
+        end do
+    call pbuf_set_field(pbuf, tend_rad_idx, tend_rad)
+    else
+       call physics_update(state, ptend, ztodt, tend)
+    end if
+    !print*,'tend_rad where it is set',tend_rad(20,10),tend%dtdt(20,10)
+    !print*,'tend_rad where it is set 2',maxval(tend_rad), minval(tend_rad), maxval(tend%dtdt) , minval(tend%dtdt)
+! end JDB
+    call physics_update(state, ptend, ztodt, tend)
+    
     call check_energy_chng(state, tend, "radheat", nstep, ztodt, zero, zero, zero, net_flx)
 
     call t_stopf('radiation')
@@ -2334,6 +2804,9 @@ subroutine phys_timestep_init(phys_state, cam_in, cam_out, pbuf2d)
   use epp_ionization,      only: epp_ionization_active
   use iop_forcing,         only: scam_use_iop_srf
   use nudging,             only: Nudge_Model, nudging_timestep_init
+!JDB
+  use cam_stoch,          only: cam_stoch_sppt,generate_spatio_temporal_randomfield
+!JDB
 
   implicit none
 
@@ -2402,6 +2875,15 @@ subroutine phys_timestep_init(phys_state, cam_in, cam_out, pbuf2d)
   ! Update Nudging values, if needed
   !----------------------------------
   if(Nudge_Model) call nudging_timestep_init(phys_state)
+!JDB
+  ! Call stochastic pattern generator 
+  !----------------------------------
+  ! The pattern update has to be done at the beginning of the timestep before the fields are chunked
+  if (cam_stoch_sppt.eq.1) then
+     call generate_spatio_temporal_randomfield
+  endif
+!JDB
+
 
 end subroutine phys_timestep_init
 
