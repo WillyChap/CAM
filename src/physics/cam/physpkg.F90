@@ -1416,7 +1416,7 @@ contains
     use cam_history,        only: hist_fld_active
     use qneg_module,        only: qneg4
     use co2_cycle,          only: co2_cycle_set_ptend
-    use nudging,            only: Nudge_Model,Nudge_ON,nudging_timestep_tend
+    use nudging,            only: Nudge_Model, Nudge_ON, nudging_timestep_tend, nudging_calc_tend, Nudge_first_step, zero_nudging !++WEC
 ! JDB 
     use cam_stoch,       only: cam_stoch_sppt, stoch_sppt_idx, ptend_update_sppt
     use cam_stoch,       only: cam_stoch_skebs
@@ -1718,11 +1718,11 @@ contains
 
     ! Update Nudging values, if needed
     !----------------------------------
-    if((Nudge_Model).and.(Nudge_ON)) then
-      call nudging_timestep_tend(state,ptend)
-      call physics_update(state,ptend,ztodt,tend)
-      call check_energy_chng(state, tend, "nudging", nstep, ztodt, zero, zero, zero, zero)
-    endif
+    !if((Nudge_Model).and.(Nudge_ON)) then
+    !  call nudging_timestep_tend(state,ptend)
+    !  call physics_update(state,ptend,ztodt,tend)
+    !  call check_energy_chng(state, tend, "nudging", nstep, ztodt, zero, zero, zero, zero)
+    !endif
     !++WEC
     ! Update Stochai values, if needed
     !----------------------------------
@@ -1987,6 +1987,8 @@ contains
     use subcol,          only: subcol_gen, subcol_ptend_avg
     use subcol_utils,    only: subcol_ptend_copy, is_subcol_on
     use qneg_module,     only: qneg3
+    use nudging,         only: Nudge_Model,Nudge_ON, nudging_timestep_tend, nudging_calc_tend, Nudge_first_step, zero_nudging, Nudge_Loc_PhysOut !++WEC
+
 !JDB
     use cam_stoch,          only: cam_stoch_sppt
 !JDB
@@ -2695,6 +2697,26 @@ contains
     ! Moist physical parameteriztions complete:
     ! send dynamical variables, and derived variables to history file
     !===================================================
+    !+++ WEC
+    if ((Nudge_Model).and.(Nudge_Loc_PhysOut)) then
+      call nudging_calc_tend(state)
+    endif
+    !--- WEC
+
+    !+++ WEC
+    if((Nudge_Model).and.(Nudge_ON)) then
+      if(Nudge_first_step) then
+          call zero_nudging(state)
+          call nudging_timestep_tend(state,ptend)
+          call physics_update(state,ptend,ztodt,tend)
+          call check_energy_chng(state, tend, "nudging", nstep, ztodt, zero, zero, zero, zero)
+      else
+          call nudging_timestep_tend(state,ptend)
+          call physics_update(state,ptend,ztodt,tend)
+          call check_energy_chng(state, tend, "nudging", nstep, ztodt, zero, zero, zero, zero)
+      endif
+    endif
+    !--- WEC
 
     call t_startf('bc_history_write')
     call diag_phys_writeout(state, pbuf)

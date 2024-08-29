@@ -210,11 +210,14 @@ module nudging
   implicit none
   private
 
-  public:: Nudge_Model,Nudge_ON
+  public:: Nudge_Model,Nudge_ON,Nudge_first_step !++WEC
   public:: nudging_readnl
   public:: nudging_init
   public:: nudging_timestep_init
   public:: nudging_timestep_tend
+  public:: nudging_calc_tend !++WEC
+  public:: zero_nudging !++WEC
+  public:: Nudge_Loc_PhysOut !++WEC
   private::nudging_update_analyses_se
   private::nudging_update_analyses_eul
   private::nudging_update_analyses_fv
@@ -227,6 +230,7 @@ module nudging
   logical          :: Nudge_Model       =.false.
   logical          :: Nudge_ON          =.false.
   logical          :: Nudge_Initialized =.false.
+  logical          :: Nudge_first_step  =.true. !++WEC
   character(len=cl):: Nudge_Path
   character(len=cs):: Nudge_File,Nudge_File_Template
   integer          :: Nudge_Force_Opt
@@ -241,7 +245,7 @@ module nudging
   real(r8)         :: Nudge_PScoef
   integer          :: Nudge_PSprof
   integer          :: Nudge_Beg_Year ,Nudge_Beg_Month
-  integer          :: Nudge_Beg_Day  ,Nudge_Beg_Sec
+  integer          :: Nudge_Beg_Day  ,Nudge_Beg_Sec, Nudge_First_Sec !++WEC
   integer          :: Nudge_End_Year ,Nudge_End_Month
   integer          :: Nudge_End_Day  ,Nudge_End_Sec
   integer          :: Nudge_Curr_Year,Nudge_Curr_Month
@@ -300,12 +304,19 @@ module nudging
   real(r8),allocatable:: Nudge_Sstep (:,:,:)  !(pcols,pver,begchunk:endchunk)
   real(r8),allocatable:: Nudge_Qstep (:,:,:)  !(pcols,pver,begchunk:endchunk)
   real(r8),allocatable:: Nudge_PSstep(:,:)    !(pcols,begchunk:endchunk)
+  !---WEC
+  logical            :: l_Update_Model, &
+                        l_Update_Nudge, &
+                        l_After_Beg,    &
+                        l_Before_End
+  !+++WEC
 
   ! Nudging Observation Arrays
   !-----------------------------
   integer               Nudge_NumObs
   integer,allocatable:: Nudge_ObsInd(:)
   logical ,allocatable::Nudge_File_Present(:)
+  logical             ::Nudge_Loc_PhysOut !++WEC whether nudging tendency is calculated at the same
   real(r8),allocatable::Nobs_U (:,:,:,:) !(pcols,pver,begchunk:endchunk,Nudge_NumObs)
   real(r8),allocatable::Nobs_V (:,:,:,:) !(pcols,pver,begchunk:endchunk,Nudge_NumObs)
   real(r8),allocatable::Nobs_T (:,:,:,:) !(pcols,pver,begchunk:endchunk,Nudge_NumObs)
@@ -358,6 +369,7 @@ contains
    Nudge_ON          =.false.
    Nudge_Beg_Sec=0
    Nudge_End_Sec=0
+   Nudge_First_Sec=21600 !+++WEC
 
    ! Set Default Namelist values
    !-----------------------------
@@ -401,6 +413,7 @@ contains
    Nudge_Vwin_Invert   = .false.
    Nudge_Vwin_lo       = 0.0_r8
    Nudge_Vwin_hi       = 1.0_r8
+   Nudge_Loc_PhysOut   = .true. !++WEC
 
    ! Read in namelist values
    !------------------------
@@ -506,6 +519,7 @@ contains
    call mpibcast(Nudge_Beg_Month    , 1, mpiint, 0, mpicom)
    call mpibcast(Nudge_Beg_Day      , 1, mpiint, 0, mpicom)
    call mpibcast(Nudge_Beg_Sec      , 1, mpiint, 0, mpicom)
+   call mpibcast(Nudge_First_Sec    , 1, mpiint, 0, mpicom)
    call mpibcast(Nudge_End_Year     , 1, mpiint, 0, mpicom)
    call mpibcast(Nudge_End_Month    , 1, mpiint, 0, mpicom)
    call mpibcast(Nudge_End_Day      , 1, mpiint, 0, mpicom)
@@ -1128,7 +1142,14 @@ contains
    YMD1=(Nudge_Next_Year*10000) + (Nudge_Next_Month*100) + Nudge_Next_Day
    call timemgr_time_ge(YMD1,Nudge_Next_Sec,            &
                         YMD ,Sec           ,Update_Nudge)
-
+   !+++ WEC
+   if ( Nudge_Loc_PhysOut ) then
+     l_Update_Model = Update_Model
+     l_Update_Nudge = Update_Nudge
+     l_After_Beg = After_Beg
+     l_Before_End = Before_End
+   end if
+   
    if((Before_End).and.(Update_Nudge)) then
      ! Increment the Nudge times by the current interval
      !---------------------------------------------------
@@ -2307,6 +2328,154 @@ contains
    !-----------
    return
   end subroutine calc_DryStaticEnergy
+  !================================================================
+  !================================================================
+  !================================================================
+  !+++WEC
+  subroutine nudging_calc_tend(state)
+   use physconst    ,only: cpair
+   use physics_types,only: physics_state
+   use constituents ,only: cnst_get_ind
+   use ppgrid       ,only: pver,pcols
+
+   ! Arguments
+   !-----------
+   type(physics_state),intent(in):: state
+
+   ! Local values
+   !----------------
+   integer :: lchnk,ncol,indw
+
+   lchnk = state%lchnk
+   ncol  = state%ncol
+
+   ! Load values at Current into the Model arrays
+   !-----------------------------------------------
+   call cnst_get_ind('Q',indw)
+   if (Nudge_Uprof .ne. 0) then
+      Model_U(:ncol,:pver,lchnk)=state%u(:ncol,:pver)
+   end if
+   if (Nudge_Vprof .ne. 0) then
+      Model_V(:ncol,:pver,lchnk)=state%v(:ncol,:pver)
+   end if
+   if (Nudge_Tprof .ne. 0) then
+      Model_T(:ncol,:pver,lchnk)=state%t(:ncol,:pver)
+   end if
+   if (Nudge_Qprof .ne. 0) then
+      Model_Q(:ncol,:pver,lchnk)=state%q(:ncol,:pver,indw)
+   end if
+   if (Nudge_PSprof .ne. 0) then
+      Model_PS(:ncol,lchnk)=state%ps(:ncol)
+   end if
+
+
+   !--- WEC
+   ! Load Dry Static Energy values for Model
+   !-----------------------------------------
+   if(Nudge_TSmode.eq.0) then
+     ! DSE tendencies from Temperature only
+     !---------------------------------------
+     Model_S(:ncol,:pver,lchnk)=cpair*Model_T(:ncol,:pver,lchnk)
+   elseif(Nudge_TSmode.eq.1) then
+       ! Caluculate DSE tendencies from Temperature, Water Vapor, and Surface Pressure
+       !------------------------------------------------------------------------------
+     call calc_DryStaticEnergy(Model_T(:,:,lchnk)  , Model_Q(:,:,lchnk), &
+                                         state%phis,  Model_PS(:,lchnk), &
+                                                 Model_S(:,:,lchnk), ncol)
+   endif
+
+   if ((l_Before_End).and.((l_Update_Nudge).or.(l_Update_Model))) then
+
+      !write(iulog,*) 'SALAD Nudge_Loc_PhysOut=',Nudge_Loc_PhysOut,'Nudge Model = ',Nudge_Model
+      if (Nudge_Uprof .ne. 0) then
+         Nudge_Ustep(:ncol,:pver,lchnk)=(  Target_U(:ncol,:pver,lchnk)  &
+                                           -Model_U(:ncol,:pver,lchnk)) &
+                                        *Nudge_Utau(:ncol,:pver,lchnk)
+      end if
+      if (Nudge_Vprof .ne. 0) then
+         Nudge_Vstep(:ncol,:pver,lchnk)=(  Target_V(:ncol,:pver,lchnk)  &
+                                           -Model_V(:ncol,:pver,lchnk)) &
+                                        *Nudge_Vtau(:ncol,:pver,lchnk)
+      end if
+      if (Nudge_Tprof .ne. 0) then
+         Nudge_Sstep(:ncol,:pver,lchnk)=(  Target_S(:ncol,:pver,lchnk)  &
+                                           -Model_S(:ncol,:pver,lchnk)) &
+                                        *Nudge_Stau(:ncol,:pver,lchnk)
+      end if
+      if (Nudge_Qprof .ne. 0) then
+         Nudge_Qstep(:ncol,:pver,lchnk)=(  Target_Q(:ncol,:pver,lchnk)  &
+                                           -Model_Q(:ncol,:pver,lchnk)) &
+                                        *Nudge_Qtau(:ncol,:pver,lchnk)
+      end if
+      if (Nudge_PSprof .ne. 0) then
+         Nudge_PSstep(:ncol,     lchnk)=(  Target_PS(:ncol,lchnk)  &
+                                           -Model_PS(:ncol,lchnk)) &
+                                        *Nudge_PStau(:ncol,lchnk)
+      end if
+      !write(iulog,*) 'SALAD =',Nudge_Ustep(:ncol,:pver,lchnk)
+   else
+
+      ! The following lines are used to reset the nudging tendency
+      ! to zero in order to perform an intermittent simulation
+      if (Nudge_Uprof .ne. 0) then
+         Nudge_Ustep(:ncol,:pver,lchnk) = 0._r8
+      end if
+      if (Nudge_Vprof .ne. 0) then
+         Nudge_Vstep(:ncol,:pver,lchnk) = 0._r8
+      end if
+      if (Nudge_Tprof .ne. 0) then
+         Nudge_Sstep(:ncol,:pver,lchnk) = 0._r8
+      end if
+      if (Nudge_Qprof .ne. 0) then
+         Nudge_Qstep(:ncol,:pver,lchnk) = 0._r8
+      end if
+      if (Nudge_PSprof .ne. 0) then
+         Nudge_PSstep(:ncol,lchnk)      = 0._r8
+      end if
+      !write(iulog,*) 'GYRO =',Nudge_Ustep(:ncol,:pver,lchnk)
+   end if         ! update nudging tendency
+
+  end subroutine  ! nudging_calc_tend
+  !================================================================
+  !---WEC
+  !================================================================
+
+  !+++WEC
+  subroutine zero_nudging(state)
+   use physics_types,only: physics_state
+   use constituents ,only: cnst_get_ind
+   use ppgrid       ,only: pver,pcols
+
+   ! Arguments
+   !-----------
+   type(physics_state),intent(in):: state
+
+   ! Local values
+   !----------------
+   integer :: lchnk,ncol,indw
+   logical :: After_First
+   integer :: Year,Month,Day,Sec
+   integer :: YMD1,YMD
+
+   lchnk = state%lchnk
+   ncol  = state%ncol
+   call cnst_get_ind('Q',indw)
+   Nudge_Qstep(:ncol,:pver,lchnk) = 0._r8
+   Nudge_Ustep(:ncol,:pver,lchnk) = 0._r8
+   Nudge_Vstep(:ncol,:pver,lchnk) = 0._r8
+   Nudge_Sstep(:ncol,:pver,lchnk) = 0._r8
+   Nudge_PSstep(:ncol,lchnk)      = 0._r8
+
+
+   call get_curr_date(Year,Month,Day,Sec)
+   YMD=(Year*10000) + (Month*100) + Day
+   YMD1=(Nudge_Beg_Year*10000) + (Nudge_Beg_Month*100) + Nudge_Beg_Day
+   call timemgr_time_ge(YMD1,Nudge_First_Sec,                                 &
+                          YMD ,Sec          ,After_First)
+
+  if(After_First) Nudge_first_step = .false.
+
+  end subroutine  ! zero_nudging
   !================================================================
 
 end module nudging
