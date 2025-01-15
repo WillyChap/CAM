@@ -4,8 +4,61 @@ module replay
 ! Purpose: Implement replay: force U,V,T,Q towards reanalysis 
 !
 ! Author: Sarah Weidman
+! Slightly tweaked by, Will Chapman (Oct 18. 2024) to add windowing functionality
 !
 ! Description:
+!    WINDOWING:
+!    ----------
+!    The region of applied replaying can be limited using Horizontal/Vertical 
+!    window functions that are constructed using a parameterization of the 
+!    Heaviside step function. 
+!
+!    The Heaviside window function is the product of separate horizonal and vertical 
+!    windows that are controled via 12 parameters:
+!
+!        Replay_Hwin_lat0:     Specify the horizontal center of the window in degrees. 
+!        Replay_Hwin_lon0:     The longitude must be in the range [0,360] and the 
+!                             latitude should be [-90,+90].
+!        Replay_Hwin_latWidth: Specify the lat and lon widths of the window as positive 
+!        Replay_Hwin_lonWidth: values in degrees.Setting a width to a large value (e.g. 999) 
+!                             renders the window a constant in that direction.
+!        Replay_Hwin_latDelta: Controls the sharpness of the window transition with a 
+!        Replay_Hwin_lonDelta: length in degrees. Small non-zero values yeild a step 
+!                             function while a large value yeilds a smoother transition.
+!        Replay_Hwin_Invert  : A logical flag used to invert the horizontal window function 
+!                             to get its compliment.(e.g. to replay outside a given window).
+!
+!        Replay_Vwin_Lindex:   In the vertical, the window is specified in terms of model 
+!        Replay_Vwin_Ldelta:   level indcies. The High and Low transition levels should 
+!        Replay_Vwin_Hindex:   range from [0,(NLEV+1)]. The transition lengths are also 
+!        Replay_Vwin_Hdelta:   specified in terms of model indices. For a window function 
+!                             constant in the vertical, the Low index should be set to 0,
+!                             the High index should be set to (NLEV+1), and the transition 
+!                             lengths should be set to 0.001 
+!        Replay_Vwin_Invert  : A logical flag used to invert the vertical window function 
+!                             to get its compliment.
+!
+!        EXAMPLE: For a channel window function centered at the equator and independent 
+!                 of the vertical (30 levels):
+!                        Replay_Hwin_lat0     = 0.         Replay_Vwin_Lindex = 0.
+!                        Replay_Hwin_latWidth = 30.        Replay_Vwin_Ldelta = 0.001
+!                        Replay_Hwin_latDelta = 5.0        Replay_Vwin_Hindex = 31.
+!                        Replay_Hwin_lon0     = 180.       Replay_Vwin_Hdelta = 0.001 
+!                        Replay_Hwin_lonWidth = 999.       Replay_Vwin_Invert = .false.
+!                        Replay_Hwin_lonDelta = 1.0
+!                        Replay_Hwin_Invert   = .false.
+!
+!                 If on the other hand one wanted to apply replaying at the poles and
+!                 not at the equator, the settings would be similar but with:
+!                        Replay_Hwin_Invert = .true.
+!
+!    A user can preview the window resulting from a given set of namelist values before 
+!    running the model. Lookat_ReplayWindow.ncl is a script avalable in the tools directory 
+!    which will read in the values for a given namelist and display the resulting window.
+!
+!    The module is currently configured for only 1 window function. It can readily be 
+!    extended for multiple windows if the need arises.
+!
 !         
 !=====================================================================
   ! Useful modules
@@ -37,14 +90,52 @@ module replay
   private:: read_netcdf_replay
   private:: interpret_filename_replay
   public:: Replay_Model ! for if statements
+  public:: replaying_init
 
   ! Replay parameters
   logical          :: Replay_Model       =.false.
   character(len=cl):: Replay_Path
   character(len=cs):: Replay_File_Template
   integer          :: Replay_Beg_Year
+  integer          :: Replay_Uprof,Replay_Vprof
+  integer          :: Replay_Qprof,Replay_Tprof
+  integer          :: Replay_PSprof
   real(r8)         :: Replay_coef
+  real(r8)         :: Replay_coef_U
+  real(r8)         :: Replay_coef_V
+  real(r8)         :: Replay_coef_T
+  real(r8)         :: Replay_coef_Q
+  real(r8)         :: Replay_coef_PS
+  real(r8)         :: Replay_Hwin_lat0
+  real(r8)         :: Replay_Hwin_latWidth
+  real(r8)         :: Replay_Hwin_latDelta
+  real(r8)         :: Replay_Hwin_lon0
+  real(r8)         :: Replay_Hwin_lonWidth
+  real(r8)         :: Replay_Hwin_lonDelta
+  logical          :: Replay_Hwin_Invert = .false.
+  real(r8)         :: Replay_Hwin_lo
+  real(r8)         :: Replay_Hwin_hi
+  real(r8)         :: Replay_Vwin_Hindex
+  real(r8)         :: Replay_Vwin_Hdelta
+  real(r8)         :: Replay_Vwin_Lindex
+  real(r8)         :: Replay_Vwin_Ldelta
+  logical          :: Replay_Vwin_Invert =.false.
+  real(r8)         :: Replay_Vwin_lo
+  real(r8)         :: Replay_Vwin_hi
+  real(r8)         :: Replay_Hwin_latWidthH
+  real(r8)         :: Replay_Hwin_lonWidthH
+  real(r8)         :: Replay_Hwin_max
+  real(r8)         :: Replay_Hwin_min
 
+  ! Replaying State Arrays: 
+  !--------------------------------
+  integer Replay_nlon,Replay_nlat,Replay_ncol,Replay_nlev
+  real(r8),allocatable:: Replay_Utau  (:,:,:)  !(pcols,pver,begchunk:endchunk)
+  real(r8),allocatable:: Replay_Vtau  (:,:,:)  !(pcols,pver,begchunk:endchunk)
+  real(r8),allocatable:: Replay_Stau  (:,:,:)  !(pcols,pver,begchunk:endchunk)
+  real(r8),allocatable:: Replay_Qtau  (:,:,:)  !(pcols,pver,begchunk:endchunk)
+  real(r8),allocatable:: Replay_PStau (:,:)    !(pcols,begchunk:endchunk)
+  
   ! replay observation arrays
   real(r8),allocatable::Ufield3d (:,:,:) !(pcols,pver,begchunk:endchunk)
   real(r8),allocatable::Vfield3d (:,:,:) !(pcols,pver,begchunk:endchunk)
@@ -70,11 +161,22 @@ contains
    !---------------
    integer ierr,unitn
 
-   namelist /replay_nl/ Replay_Model,Replay_Path,                       &
-                         Replay_File_Template, Replay_Beg_Year,         &
-                         Replay_coef 
-                         
-
+   namelist /replay_nl/ Replay_Model,Replay_Path,                      &
+                         Replay_File_Template, Replay_Beg_Year,        &
+                         Replay_coef, Replay_coef_U, Replay_coef_V,    &
+                         Replay_coef_T, Replay_coef_Q, Replay_coef_PS, &
+                         Replay_Uprof,                     &
+                         Replay_Vprof,                     &
+                         Replay_Qprof,                     &
+                         Replay_Tprof,                     &
+                         Replay_PSprof,                    &
+                         Replay_Hwin_lat0,Replay_Hwin_lon0,              &
+                         Replay_Hwin_latWidth,Replay_Hwin_lonWidth,      &
+                         Replay_Hwin_latDelta,Replay_Hwin_lonDelta,      &
+                         Replay_Hwin_Invert,                            &
+                         Replay_Vwin_Lindex,Replay_Vwin_Hindex,          &
+                         Replay_Vwin_Ldelta,Replay_Vwin_Hdelta,          &
+                         Replay_Vwin_Invert                            
 
    ! Set Default Namelist values
    !-----------------------------
@@ -83,7 +185,33 @@ contains
    Replay_File_Template = 'MERRA2_%y%m%d_%h.nc'
    Replay_Beg_Year      = 1980
    Replay_coef          = 1._r8
-
+   Replay_coef_U        = 1._r8
+   Replay_coef_V        = 1._r8
+   Replay_coef_T        = 1._r8
+   Replay_coef_Q        = 1._r8
+   Replay_coef_PS       = 1._r8
+   Replay_Hwin_lat0     = 0._r8
+   Replay_Hwin_lat0     = 0._r8
+   Replay_Hwin_latWidth = 9999._r8
+   Replay_Hwin_latDelta = 1.0_r8
+   Replay_Hwin_lon0     = 180._r8
+   Replay_Hwin_lonWidth = 9999._r8
+   Replay_Hwin_lonDelta = 1.0_r8
+   Replay_Hwin_Invert   = .false.
+   Replay_Hwin_lo       = 0.0_r8
+   Replay_Hwin_hi       = 1.0_r8
+   Replay_Vwin_Hindex   = float(pver+1)
+   Replay_Vwin_Hdelta   = 0.001_r8
+   Replay_Vwin_Lindex   = 0.0_r8
+   Replay_Vwin_Ldelta   = 0.001_r8
+   Replay_Vwin_Invert   = .false.
+   Replay_Vwin_lo       = 0.0_r8
+   Replay_Vwin_hi       = 1.0_r8
+   Replay_Uprof         = 0
+   Replay_Vprof         = 0
+   Replay_Qprof         = 0
+   Replay_Tprof         = 0
+   Replay_PSprof        = 0
    ! Read in namelist values
    !------------------------
    if(masterproc) then
@@ -100,6 +228,82 @@ contains
      call freeunit(unitn)
    endif
 
+   write(iulog,*) 'REPLAYING:  Replay_Hwin_Invert=',Replay_Hwin_Invert
+   write(iulog,*) 'REPLAYING:  Replay_Hwin_Invert=',Replay_Hwin_Invert
+   write(iulog,*) 'REPLAYING:  Replay_Hwin_Invert=',Replay_Hwin_Invert
+   write(iulog,*) 'REPLAYING:  Replay_Hwin_Invert=',Replay_Hwin_Invert
+   write(iulog,*) 'REPLAYING:  Replay_Hwin_Invert=',Replay_Hwin_Invert
+   write(iulog,*) 'REPLAYING:  Replay_Hwin_Invert=',Replay_Hwin_Invert
+
+   ! Set hi/lo values according to the given '_Invert' parameters
+   !--------------------------------------------------------------
+   if(Replay_Hwin_Invert) then
+     Replay_Hwin_lo = 0.0_r8
+     Replay_Hwin_hi = 1.0_r8
+   else
+     Replay_Hwin_lo = 1.0_r8
+     Replay_Hwin_hi = 0.0_r8
+   endif
+
+   write(iulog,*) 'REPLAYING:  Replay_Hwin_lo=',Replay_Hwin_lo
+   write(iulog,*) 'REPLAYING:  Replay_Hwin_lo=',Replay_Hwin_lo
+   write(iulog,*) 'REPLAYING:  Replay_Hwin_lo=',Replay_Hwin_lo
+   write(iulog,*) 'REPLAYING:  Replay_Hwin_hi=',Replay_Hwin_hi
+   write(iulog,*) 'REPLAYING:  Replay_Hwin_hi=',Replay_Hwin_hi
+   write(iulog,*) 'REPLAYING:  Replay_Hwin_hi=',Replay_Hwin_hi
+
+
+   if(Replay_Vwin_Invert) then
+     Replay_Vwin_lo = 1.0_r8
+     Replay_Vwin_hi = 0.0_r8
+   else
+     Replay_Vwin_lo = 0.0_r8
+     Replay_Vwin_hi = 1.0_r8
+   endif
+
+   ! Check for valid namelist values 
+   !----------------------------------
+   if((Replay_Hwin_lat0.lt.-90._r8).or.(Replay_Hwin_lat0.gt.+90._r8)) then
+     write(iulog,*) 'REPLAYING: Window lat0 must be in [-90,+90]'
+     write(iulog,*) 'REPLAYING:  Replay_Hwin_lat0=',Replay_Hwin_lat0
+     call endrun('replaying_readnl:: ERROR in namelist')
+   endif
+
+   if((Replay_Hwin_lon0.lt.0._r8).or.(Replay_Hwin_lon0.ge.360._r8)) then
+     write(iulog,*) 'REPLAYING: Window lon0 must be in [0,+360)'
+     write(iulog,*) 'REPLAYING:  Replay_Hwin_lon0=',Replay_Hwin_lon0
+     call endrun('replaying_readnl:: ERROR in namelist')
+   endif
+
+   if((Replay_Vwin_Lindex.gt.Replay_Vwin_Hindex)                         .or. &
+      (Replay_Vwin_Hindex.gt.float(pver+1)).or.(Replay_Vwin_Hindex.lt.0._r8).or. &
+      (Replay_Vwin_Lindex.gt.float(pver+1)).or.(Replay_Vwin_Lindex.lt.0._r8)   ) then
+     write(iulog,*) 'REPLAYING: Window Lindex must be in [0,pver+1]'
+     write(iulog,*) 'REPLAYING: Window Hindex must be in [0,pver+1]'
+     write(iulog,*) 'REPLAYING: Lindex must be LE than Hindex'
+     write(iulog,*) 'REPLAYING:  Replay_Vwin_Lindex=',Replay_Vwin_Lindex
+     write(iulog,*) 'REPLAYING:  Replay_Vwin_Hindex=',Replay_Vwin_Hindex
+     call endrun('replaying_readnl:: ERROR in namelist')
+   endif
+
+   if((Replay_Hwin_latDelta.le.0._r8).or.(Replay_Hwin_lonDelta.le.0._r8).or. &
+      (Replay_Vwin_Hdelta  .le.0._r8).or.(Replay_Vwin_Ldelta  .le.0._r8)    ) then
+     write(iulog,*) 'REPLAYING: Window Deltas must be positive'
+     write(iulog,*) 'REPLAYING:  Replay_Hwin_latDelta=',Replay_Hwin_latDelta
+     write(iulog,*) 'REPLAYING:  Replay_Hwin_lonDelta=',Replay_Hwin_lonDelta
+     write(iulog,*) 'REPLAYING:  Replay_Vwin_Hdelta=',Replay_Vwin_Hdelta
+     write(iulog,*) 'REPLAYING:  Replay_Vwin_Ldelta=',Replay_Vwin_Ldelta
+     call endrun('replaying_readnl:: ERROR in namelist')
+
+   endif
+
+   if((Replay_Hwin_latWidth.le.0._r8).or.(Replay_Hwin_lonWidth.le.0._r8)) then
+     write(iulog,*) 'REPLAYING: Window widths must be positive'
+     write(iulog,*) 'REPLAYING:  Replay_Hwin_latWidth=',Replay_Hwin_latWidth
+     write(iulog,*) 'REPLAYING:  Replay_Hwin_lonWidth=',Replay_Hwin_lonWidth
+     call endrun('replaying_readnl:: ERROR in namelist')
+   endif
+
    ! Broadcast namelist variables
    !------------------------------
 #ifdef SPMD
@@ -108,6 +312,33 @@ contains
    call mpibcast(Replay_Model        , 1, mpilog, 0, mpicom)
    call mpibcast(Replay_Beg_Year     , 1, mpiint, 0, mpicom)
    call mpibcast(Replay_coef         , 1, mpir8 , 0, mpicom)
+   call mpibcast(Replay_coef_U       , 1, mpir8 , 0, mpicom)
+   call mpibcast(Replay_coef_V       , 1, mpir8 , 0, mpicom)
+   call mpibcast(Replay_coef_T       , 1, mpir8 , 0, mpicom)
+   call mpibcast(Replay_coef_Q       , 1, mpir8 , 0, mpicom)
+   call mpibcast(Replay_coef_PS      , 1, mpir8 , 0, mpicom)
+   call mpibcast(Replay_Hwin_lo      , 1, mpir8 , 0, mpicom)
+   call mpibcast(Replay_Hwin_hi      , 1, mpir8 , 0, mpicom)
+   call mpibcast(Replay_Hwin_lat0    , 1, mpir8 , 0, mpicom)
+   call mpibcast(Replay_Hwin_latWidth, 1, mpir8 , 0, mpicom)
+   call mpibcast(Replay_Hwin_latDelta, 1, mpir8 , 0, mpicom)
+   call mpibcast(Replay_Hwin_lon0    , 1, mpir8 , 0, mpicom)
+   call mpibcast(Replay_Hwin_lonWidth, 1, mpir8 , 0, mpicom)
+   call mpibcast(Replay_Hwin_lonDelta, 1, mpir8 , 0, mpicom)
+   call mpibcast(Replay_Hwin_Invert  , 1, mpilog, 0, mpicom)
+   call mpibcast(Replay_Vwin_lo      , 1, mpir8 , 0, mpicom)
+   call mpibcast(Replay_Vwin_hi      , 1, mpir8 , 0, mpicom)
+   call mpibcast(Replay_Vwin_Hindex  , 1, mpir8 , 0, mpicom)
+   call mpibcast(Replay_Vwin_Hdelta  , 1, mpir8 , 0, mpicom)
+   call mpibcast(Replay_Vwin_Lindex  , 1, mpir8 , 0, mpicom)
+   call mpibcast(Replay_Vwin_Ldelta  , 1, mpir8 , 0, mpicom)
+   call mpibcast(Replay_Vwin_Invert  , 1, mpilog, 0, mpicom)
+   call mpibcast(Replay_Uprof        , 1, mpiint, 0, mpicom)
+   call mpibcast(Replay_Vprof        , 1, mpiint, 0, mpicom)
+   call mpibcast(Replay_Tprof        , 1, mpiint, 0, mpicom)
+   call mpibcast(Replay_Qprof        , 1, mpiint, 0, mpicom)
+   call mpibcast(Replay_PSprof       , 1, mpiint, 0, mpicom)
+   
 #endif
 
 if(masterproc) then
@@ -120,6 +351,7 @@ if(masterproc) then
   write(iulog,*) 'REPLAY: Replay_File_Template =',Replay_File_Template
   write(iulog,*) 'REPLAY: Replay_Beg_Year =',Replay_Beg_Year
   write(iulog,*) 'REPLAY: Replay_coef  =',Replay_coef
+  
 endif
 
    ! End Routine
@@ -128,6 +360,146 @@ endif
   end subroutine ! replay_readnl
   !================================================================
 
+  !================================================================
+  subroutine replaying_init
+   ! 
+   ! REPLAYING_INIT: Allocate space and initialize Replaying values
+   !===============================================================
+   use ppgrid        ,only: pver,pcols,begchunk,endchunk
+   use error_messages,only: alloc_err
+   use dycore        ,only: dycore_is
+   use dyn_grid      ,only: get_horiz_grid_dim_d
+   use phys_grid     ,only: get_rlat_p,get_rlon_p,get_ncols_p
+   use cam_history   ,only: addfld
+   use shr_const_mod ,only: SHR_CONST_PI
+   use filenames     ,only: interpret_filename_spec
+
+   ! Local values
+   !----------------
+   integer  Year,Month,Day,Sec
+   integer  YMD1,YMD
+   logical  After_Beg,Before_End
+   integer  istat,lchnk,ncol,icol,ilev
+   integer  hdim1_d,hdim2_d
+   integer  dtime
+   real(r8) rlat,rlon
+   real(r8) Wprof(pver)
+   real(r8) lonp,lon0,lonn,latp,lat0,latn
+   real(r8) Val1_p,Val2_p,Val3_p,Val4_p
+   real(r8) Val1_0,Val2_0,Val3_0,Val4_0
+   real(r8) Val1_n,Val2_n,Val3_n,Val4_n
+   integer               nn
+
+
+   ! Allocate Space for spatial dependence of 
+   ! Replaying Coefs and Replaying Forcing.
+   !-------------------------------------------
+   allocate(Replay_Utau(pcols,pver,begchunk:endchunk),stat=istat)
+   call alloc_err(istat,'replaying_init','Replay_Utau',pcols*pver*((endchunk-begchunk)+1))
+   allocate(Replay_Vtau(pcols,pver,begchunk:endchunk),stat=istat)
+   call alloc_err(istat,'replaying_init','Replay_Vtau',pcols*pver*((endchunk-begchunk)+1))
+   allocate(Replay_Stau(pcols,pver,begchunk:endchunk),stat=istat)
+   call alloc_err(istat,'replaying_init','Replay_Stau',pcols*pver*((endchunk-begchunk)+1))
+   allocate(Replay_Qtau(pcols,pver,begchunk:endchunk),stat=istat)
+   call alloc_err(istat,'replaying_init','Replay_Qtau',pcols*pver*((endchunk-begchunk)+1))
+   allocate(Replay_PStau(pcols,begchunk:endchunk),stat=istat)
+   call alloc_err(istat,'replaying_init','Replay_PStau',pcols*((endchunk-begchunk)+1))
+
+   !-----------------------------------------
+   ! Values initialized only by masterproc
+   !-----------------------------------------
+   if(masterproc) then
+   ! Initialize values for window function  
+   !----------------------------------------
+
+   write(iulog,*) 'REPLAYING:  HOTDOG Replay_Hwin_lo=',Replay_Hwin_lo
+   write(iulog,*) 'REPLAYING:  HOTDOG Replay_Hwin_lo=',Replay_Hwin_lo
+   write(iulog,*) 'REPLAYING:  HOTDOG Replay_Hwin_lo=',Replay_Hwin_lo
+   write(iulog,*) 'REPLAYING:  HOTDOG Replay_Hwin_hi=',Replay_Hwin_hi
+   write(iulog,*) 'REPLAYING:  HOTDOG Replay_Hwin_hi=',Replay_Hwin_hi
+   write(iulog,*) 'REPLAYING:  HOTDOG Replay_Hwin_hi=',Replay_Hwin_hi
+   write(iulog,*) 'REPLAYING:  HOTDOG Replay_Hwin_max=',Replay_Hwin_max
+   write(iulog,*) 'REPLAYING:  HOTDOG Replay_Hwin_min=',Replay_Hwin_min
+   
+   lonp= 180._r8
+   lon0=   0._r8
+   lonn=-180._r8
+   latp=  90._r8-Replay_Hwin_lat0
+   lat0=   0._r8
+   latn= -90._r8-Replay_Hwin_lat0
+
+   Replay_Hwin_lonWidthH=Replay_Hwin_lonWidth/2._r8
+   Replay_Hwin_latWidthH=Replay_Hwin_latWidth/2._r8
+
+   Val1_p=(1._r8+tanh((Replay_Hwin_lonWidthH+lonp)/Replay_Hwin_lonDelta))/2._r8
+   Val2_p=(1._r8+tanh((Replay_Hwin_lonWidthH-lonp)/Replay_Hwin_lonDelta))/2._r8
+   Val3_p=(1._r8+tanh((Replay_Hwin_latWidthH+latp)/Replay_Hwin_latDelta))/2._r8
+   Val4_p=(1._r8+tanh((Replay_Hwin_latWidthH-latp)/Replay_Hwin_latDelta))/2_r8
+   Val1_0=(1._r8+tanh((Replay_Hwin_lonWidthH+lon0)/Replay_Hwin_lonDelta))/2._r8
+   Val2_0=(1._r8+tanh((Replay_Hwin_lonWidthH-lon0)/Replay_Hwin_lonDelta))/2._r8
+   Val3_0=(1._r8+tanh((Replay_Hwin_latWidthH+lat0)/Replay_Hwin_latDelta))/2._r8
+   Val4_0=(1._r8+tanh((Replay_Hwin_latWidthH-lat0)/Replay_Hwin_latDelta))/2._r8
+
+   Val1_n=(1._r8+tanh((Replay_Hwin_lonWidthH+lonn)/Replay_Hwin_lonDelta))/2._r8
+   Val2_n=(1._r8+tanh((Replay_Hwin_lonWidthH-lonn)/Replay_Hwin_lonDelta))/2._r8
+   Val3_n=(1._r8+tanh((Replay_Hwin_latWidthH+latn)/Replay_Hwin_latDelta))/2._r8
+   Val4_n=(1._r8+tanh((Replay_Hwin_latWidthH-latn)/Replay_Hwin_latDelta))/2._r8
+
+   Replay_Hwin_max=     Val1_0*Val2_0*Val3_0*Val4_0
+   Replay_Hwin_min=min((Val1_p*Val2_p*Val3_n*Val4_n), &
+                   (Val1_p*Val2_p*Val3_p*Val4_p), &
+                   (Val1_n*Val2_n*Val3_n*Val4_n), &
+                   (Val1_n*Val2_n*Val3_p*Val4_p))
+
+   write(iulog,*) 'REPLAYING:  HOTDOGS Replay_Hwin_max=',Replay_Hwin_max
+   write(iulog,*) 'REPLAYING:  HOTDOGS Replay_Hwin_min=',Replay_Hwin_min
+
+  endif ! (masterproc) then
+
+  call mpibcast(Replay_ncol          ,            1, mpiint, 0, mpicom)
+  call mpibcast(Replay_nlev          ,            1, mpiint, 0, mpicom)
+  call mpibcast(Replay_nlon          ,            1, mpiint, 0, mpicom)
+  call mpibcast(Replay_nlat          ,            1, mpiint, 0, mpicom)
+  call mpibcast(Replay_Hwin_max      ,            1, mpir8 , 0, mpicom)
+  call mpibcast(Replay_Hwin_min      ,            1, mpir8 , 0, mpicom)
+  call mpibcast(Replay_Hwin_lonWidthH,            1, mpir8 , 0, mpicom)
+  call mpibcast(Replay_Hwin_latWidthH,            1, mpir8 , 0, mpicom)
+
+
+  ! Initialize replaying Coeffcient profiles in local arrays
+   ! Load zeros into replaying arrays
+   !------------------------------------------------------
+   do lchnk=begchunk,endchunk
+     ncol=get_ncols_p(lchnk)
+     do icol=1,ncol
+       rlat=get_rlat_p(lchnk,icol)*180._r8/SHR_CONST_PI
+       rlon=get_rlon_p(lchnk,icol)*180._r8/SHR_CONST_PI
+       call replaying_set_profile(rlat,rlon,Replay_Uprof,Wprof,pver) !!! EMERGENCY !!!! need to define PROF (0,1,2)
+       Replay_Utau(icol,:,lchnk)=Wprof(:)
+       call replaying_set_profile(rlat,rlon,Replay_Vprof,Wprof,pver) !!! EMERGENCY !!!! need to define PROF (0,1,2)
+       Replay_Vtau(icol,:,lchnk)=Wprof(:)
+       call replaying_set_profile(rlat,rlon,Replay_Tprof,Wprof,pver) !!! EMERGENCY !!!! need to define PROF (0,1,2)
+       Replay_Stau(icol,:,lchnk)=Wprof(:)
+       call replaying_set_profile(rlat,rlon,Replay_Qprof,Wprof,pver) !!! EMERGENCY !!!! need to define PROF (0,1,2)
+       Replay_Qtau(icol,:,lchnk)=Wprof(:)
+       Replay_PStau(icol,lchnk)=replaying_set_PSprofile(rlat,rlon,1)
+     end do
+     Replay_Utau(:ncol,:pver,lchnk) =                             &
+     Replay_Utau(:ncol,:pver,lchnk) * Replay_coef_U
+     Replay_Vtau(:ncol,:pver,lchnk) =                             &
+     Replay_Vtau(:ncol,:pver,lchnk) * Replay_coef_V
+     Replay_Stau(:ncol,:pver,lchnk) =                             &
+     Replay_Stau(:ncol,:pver,lchnk) * Replay_coef_T
+     Replay_Qtau(:ncol,:pver,lchnk) =                             &
+     Replay_Qtau(:ncol,:pver,lchnk) * Replay_coef_Q
+     Replay_PStau(:ncol,lchnk)=                             &
+     Replay_PStau(:ncol,lchnk)* Replay_coef_PS
+
+   end do
+
+  end subroutine ! replaying_init
+  !================================================================
+    
   subroutine replay_register
 
     use physics_buffer,     only: pbuf_add_field, dtype_r8
@@ -868,10 +1240,10 @@ end function interpret_filename_replay
     do i = 1, ncols
     do k=1,pver   
     
-        ptend%q(i,k,indw) = ptend%q(i,k,indw) + state(c)%qforce(i,k)/forcingtime*Replay_coef 
-        ptend%u(i,k) = ptend%u(i,k) + state(c)%uforce(i,k)/forcingtime*Replay_coef 
-        ptend%v(i,k) = ptend%v(i,k) + state(c)%vforce(i,k)/forcingtime*Replay_coef 
-        ptend%s(i,k) = ptend%s(i,k) + state(c)%sforce(i,k)/forcingtime*Replay_coef 
+        ptend%q(i,k,indw) = ptend%q(i,k,indw) + state(c)%qforce(i,k)/forcingtime*Replay_coef*Replay_Qtau(i,k,c)
+        ptend%u(i,k) = ptend%u(i,k) + state(c)%uforce(i,k)/forcingtime*Replay_coef*Replay_Utau(i,k,c)
+        ptend%v(i,k) = ptend%v(i,k) + state(c)%vforce(i,k)/forcingtime*Replay_coef*Replay_Vtau(i,k,c) 
+        ptend%s(i,k) = ptend%s(i,k) + state(c)%sforce(i,k)/forcingtime*Replay_coef*Replay_Stau(i,k,c) 
     
     !
     end do
@@ -965,10 +1337,10 @@ end function interpret_filename_replay
                 ncols = get_ncols_p(c)
                 do i = 1, ncols
                     do k=1,pver
-                        state(c)%qforce(i,k)=((Qfield3d(i,k,c)-state(c)%q(i,k,1)))
-                        state(c)%uforce(i,k)=((Ufield3d(i,k,c)-state(c)%u(i,k)))
-                        state(c)%vforce(i,k)=((Vfield3d(i,k,c)-state(c)%v(i,k)))
-                        state(c)%sforce(i,k)=((Tfield3d(i,k,c)-state(c)%t(i,k)))*cpair
+                        state(c)%qforce(i,k)=((Qfield3d(i,k,c)-state(c)%q(i,k,1)))*Replay_Qtau(i,k,c) !IDK if this is right
+                        state(c)%uforce(i,k)=((Ufield3d(i,k,c)-state(c)%u(i,k)))*Replay_Utau(i,k,c)
+                        state(c)%vforce(i,k)=((Vfield3d(i,k,c)-state(c)%v(i,k)))*Replay_Vtau(i,k,c)
+                        state(c)%sforce(i,k)=((Tfield3d(i,k,c)-state(c)%t(i,k)))*cpair*Replay_Stau(i,k,c)
                     end do
                 end do
             end do
@@ -992,6 +1364,155 @@ end function interpret_filename_replay
     end if
     
     end subroutine replay_correction
+
+
+  !================================================================
+  subroutine replaying_set_profile(rlat,rlon,Replay_prof,Wprof,nlev)
+   ! 
+   ! REPLAYING_SET_PROFILE: for the given lat,lon, and Replaying_prof, set
+   !                      the verical profile of window coeffcients.
+   !                      Values range from 0. to 1. to affect spatial
+   !                      variations on replaying strength.
+   !===============================================================
+
+   ! Arguments
+   !--------------
+   integer  nlev,Replay_prof
+   real(r8) rlat,rlon
+   real(r8) Wprof(nlev)
+
+   ! Local values
+   !----------------
+   integer  ilev
+   real(r8) Hcoef,latx,lonx,Vmax,Vmin
+   real(r8) lon_lo,lon_hi,lat_lo,lat_hi,lev_lo,lev_hi
+
+   write(iulog,*) "hairdo", Replay_prof
+
+   !---------------
+   ! set coeffcient
+   !---------------
+   if(Replay_prof.eq.0) then
+     ! No Replaying
+     !-------------
+     Wprof(:)=0.0_r8
+   elseif(Replay_prof.eq.1) then
+     ! Uniform Replaying
+     !-----------------
+     Wprof(:)=1.0_r8
+   elseif(Replay_prof.eq.2) then
+     write(iulog,*) "catdog"
+     ! Localized Replaying with specified Heaviside window function
+     !------------------------------------------------------------
+     if(Replay_Hwin_max.le.Replay_Hwin_min) then
+       write(iulog,*) "bingo"
+       ! For a constant Horizontal window function, 
+       ! just set Hcoef to the maximum of Hlo/Hhi.
+       !--------------------------------------------
+       Hcoef=max(Replay_Hwin_lo,Replay_Hwin_hi)
+     else
+       write(iulog,*) "crango", Replay_Hwin_lo, Replay_Hwin_hi
+       ! get lat/lon relative to window center
+       !------------------------------------------
+       latx=rlat-Replay_Hwin_lat0
+       lonx=rlon-Replay_Hwin_lon0
+       if(lonx.gt. 180._r8) lonx=lonx-360._r8
+       if(lonx.le.-180._r8) lonx=lonx+360._r8
+
+       ! Calcualte RAW window value
+       !-------------------------------
+       lon_lo=(Replay_Hwin_lonWidthH+lonx)/Replay_Hwin_lonDelta
+       lon_hi=(Replay_Hwin_lonWidthH-lonx)/Replay_Hwin_lonDelta
+       lat_lo=(Replay_Hwin_latWidthH+latx)/Replay_Hwin_latDelta
+       lat_hi=(Replay_Hwin_latWidthH-latx)/Replay_Hwin_latDelta
+       Hcoef=((1._r8+tanh(lon_lo))/2._r8)*((1._r8+tanh(lon_hi))/2._r8) &
+            *((1._r8+tanh(lat_lo))/2._r8)*((1._r8+tanh(lat_hi))/2._r8)
+
+       ! Scale the horizontal window coef for specfied range of values.
+       !--------------------------------------------------------
+       Hcoef=(Hcoef-Replay_Hwin_min)/(Replay_Hwin_max-Replay_Hwin_min)
+       Hcoef=(1._r8-Hcoef)*Replay_Hwin_lo + Hcoef*Replay_Hwin_hi
+       write(*,*) "blammy", Replay_Hwin_lo, Replay_Hwin_hi, Hcoef
+     endif
+
+     ! Load the RAW vertical window
+     !------------------------------
+     do ilev=1,nlev
+       lev_lo=(float(ilev)-Replay_Vwin_Lindex)/Replay_Vwin_Ldelta
+       lev_hi=(Replay_Vwin_Hindex-float(ilev))/Replay_Vwin_Hdelta
+       Wprof(ilev)=((1._r8+tanh(lev_lo))/2._r8)*((1._r8+tanh(lev_hi))/2._r8)
+     end do 
+
+     ! Scale the Window function to span the values between Vlo and Vhi:
+     !-----------------------------------------------------------------
+     Vmax=maxval(Wprof)
+     Vmin=minval(Wprof)
+     if((Vmax.le.Vmin).or.((Replay_Vwin_Hindex.ge.(nlev+1)).and. &
+                           (Replay_Vwin_Lindex.le. 0      )     )) then
+       ! For a constant Vertical window function, 
+       ! load maximum of Vlo/Vhi into Wprof()
+       !--------------------------------------------
+       Vmax=max(Replay_Vwin_lo,Replay_Vwin_hi)
+       Wprof(:)=Vmax
+     else
+       ! Scale the RAW vertical window for specfied range of values.
+       !--------------------------------------------------------
+       Wprof(:)=(Wprof(:)-Vmin)/(Vmax-Vmin)
+       Wprof(:)=Replay_Vwin_lo + Wprof(:)*(Replay_Vwin_hi-Replay_Vwin_lo)
+     endif
+
+     ! The desired result is the product of the vertical profile 
+     ! and the horizontal window coeffcient.
+     !----------------------------------------------------
+     Wprof(:)=Hcoef*Wprof(:)
+   else
+     call endrun('replaying_set_profile:: Unknown Replay_prof value')
+   endif
+
+   ! End Routine
+   !------------
+   return
+  end subroutine ! replaying_set_profile
+  !================================================================
+
+
+  !================================================================
+  real(r8) function replaying_set_PSprofile(rlat,rlon,Replay_PSprof)
+   ! 
+   ! REPLAYING_SET_PSPROFILE: for the given lat and lon set the surface
+   !                      pressure profile value for the specified index.
+   !                      Values range from 0. to 1. to affect spatial
+   !                      variations on replaying strength.
+   !===============================================================
+
+   ! Arguments
+   !--------------
+   real(r8) rlat,rlon
+   integer  Replay_PSprof
+
+   ! Local values
+   !----------------
+
+   !---------------
+   ! set coeffcient
+   !---------------
+   if(Replay_PSprof.eq.0) then
+     ! No Replaying
+     !-------------
+     replaying_set_PSprofile=0.0_r8
+   elseif(Replay_PSprof.eq.1) then
+     ! Uniform Replaying
+     !-----------------
+     replaying_set_PSprofile=1.0_r8
+   else
+     call endrun('replaying_set_PSprofile:: Unknown Replay_prof value')
+   endif
+
+   ! End Routine
+   !------------
+   return
+  end function ! replaying_set_PSprofile
+  !================================================================
 
 
   !================================================================

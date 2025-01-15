@@ -756,6 +756,7 @@ contains
     use dadadj_cam,         only: dadadj_init
     use cam_abortutils,     only: endrun
     use nudging,            only: Nudge_Model, nudging_init
+    use replay,             only: Replay_Model, replaying_init
 
     ! Input/output arguments
     type(physics_state), pointer       :: phys_state(:)
@@ -924,6 +925,7 @@ contains
     ! Initialize Nudging Parameters
     !--------------------------------
     if(Nudge_Model) call nudging_init
+    if(Replay_Model) call replaying_init
 
     if (clim_modal_aero) then
 
