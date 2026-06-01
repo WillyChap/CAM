@@ -1533,7 +1533,7 @@ end subroutine pbuf_readnl
   subroutine read_restart_field_{TYPE} (File, pbuf2d, index, gdimlens, grank)
     use pio,              only: file_desc_t
     use pio,              only: pio_inq_varid
-    use cam_pio_utils,    only: cam_pio_handle_error
+    use cam_pio_utils,    only: cam_pio_handle_error, cam_pio_find_var
     use cam_grid_support, only: cam_grid_read_dist_array
     use subcol_pack_mod,  only: subcol_pack
     use phys_grid,        only: phys_decomp
@@ -1558,6 +1558,7 @@ end subroutine pbuf_readnl
     integer                            :: fdimlens(3) ! Array dimensions on NetCDF file
     integer                            :: frank       ! Array rank on file
     integer                            :: adimlens(3) ! Array dimensions
+    logical                            :: found_var
 
     character(len=24)                  :: varname
     character(len=*), parameter        :: subname = 'read_restart_field_{TYPE}'
@@ -1588,8 +1589,8 @@ end subroutine pbuf_readnl
       end if
 
       varname = trim(pbuf%hdr%name)//trim(field_grid_suff(grid_select))
-      ierr = pio_inq_varid(File, varname, pbuf%hdr%vardesc(grid_select))
-      call cam_pio_handle_error(ierr, trim(subname)//': '//trim(varname)//' not found')
+      call cam_pio_find_var(File, varname, pbuf%hdr%vardesc(grid_select), found_var)
+      if (.not. found_var) return  ! field not in restart (new field or different build); leave as pbuf_initialize zero
 
       allocate(field(adimlens(1), adimlens(2), begchunk:endchunk))
       if (size(field,2) == 1) then

@@ -250,8 +250,8 @@ subroutine radiation_register
 
    call pbuf_add_field('FLNS' , 'global',dtype_r8,(/pcols/), flns_idx) ! Surface net longwave flux
    call pbuf_add_field('FLNT' , 'global',dtype_r8,(/pcols/), flnt_idx) ! Top-of-model net longwave flux
-   call pbuf_add_field('FLNTC', 'global', dtype_r8, (/pcols/),flntc_idx) !++WEC
-   call pbuf_add_field('FSNTOA', 'global', dtype_r8, (/pcols/),fsntoa_idx) !++WEC
+   call pbuf_add_field('FLNTC',  'phys_pkg', dtype_r8, (/pcols/),flntc_idx)  !++WEC (phys_pkg: not in restart, LE2 cam.r compatibility)
+   call pbuf_add_field('FSNTOA', 'phys_pkg', dtype_r8, (/pcols/),fsntoa_idx) !++WEC (phys_pkg: not in restart, LE2 cam.r compatibility)
 
    ! If the namelist has been configured for preserving the spectral fluxes, then create
    ! physics buffer variables to store the results.

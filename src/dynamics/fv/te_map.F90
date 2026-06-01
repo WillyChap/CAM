@@ -160,7 +160,7 @@ contains
       real(r8), parameter :: psurf = 100001.0_r8
       real(r8), parameter :: bet   = D2_0*alf/(D1_0+alf)
 
-      real(r8), parameter :: lagrangianlevcrit = 1.0e-11_r8 ! Criteria for "Lagrangian levels are crossing" error
+      real(r8), parameter :: lagrangianlevcrit = 0.0_r8 ! Only abort on truly inverted levels (negative dp); 1e-11 threshold was too strict for LE2 hybrid IC
 
 ! Local arrays:
 ! -------------

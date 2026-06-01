@@ -178,6 +178,21 @@
        Default: 0
        </entry>
 
+<entry id="Nudge_Do" type="integer" category="nudging"
+       group="nudging_nl" valid_values="0,1" >
+       Select the formula used to convert Target arrays into the per-timestep
+       nudging tendency Nudge_Ustep (and V/T/Q/PS analogues).
+         0 == STANDARD: Nudge_Ustep = (Target - Model) * Tscale * Utau
+              Target arrays contain FIELD VALUES (e.g., U in m/s, T in K, etc.).
+              This is the correct path for analysis-driven nudging (ERA5, MERRA,
+              and any external file containing raw atmospheric state).
+         1 == ML-TENDENCY: Nudge_Ustep = Target * Utau   (no Model subtraction)
+              Caller must pre-compute Target arrays as physics tendencies upstream.
+              Using mode 1 with field-value Target arrays causes runaway divergence
+              (state grows unbounded each step) and CFL failure in the dycore.
+       Default: 0
+       </entry>
+
 <entry id="Nudge_TimeScale_Opt" type="integer" category="nudging"
        group="nudging_nl" valid_values="" >
        Select the timescale of nudging force, where (t'==Analysis times ; t==Model Times)

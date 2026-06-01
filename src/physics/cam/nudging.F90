@@ -355,7 +355,8 @@ contains
                          Nudge_Hwin_Invert,                            &
                          Nudge_Vwin_Lindex,Nudge_Vwin_Hindex,          &
                          Nudge_Vwin_Ldelta,Nudge_Vwin_Hdelta,          &
-                         Nudge_Vwin_Invert
+                         Nudge_Vwin_Invert,                            &
+                         Nudge_Do
 
    ! Nudging is NOT initialized yet, For now
    ! Nudging will always begin/end at midnight.
@@ -407,7 +408,13 @@ contains
    Nudge_Vwin_Invert   = .false.
    Nudge_Vwin_lo       = 0.0_r8
    Nudge_Vwin_hi       = 1.0_r8
-   Nudge_Do            = 1 !adding control to start ML [WEC]
+   ! Nudge_Do mode select (now namelist-settable, default = 0 = standard Newtonian):
+   !   0 = standard CAM6 nudging — Nudge_Ustep = (Target - Model) * Tscale * Utau
+   !       Target_X arrays contain field VALUES (m/s, K, kg/kg, Pa). Safe default.
+   !   1 = ML-tendency mode — Nudge_Ustep = Target * Utau (NO -Model term).
+   !       Caller must pre-compute Target_X as physics tendencies. Diverges if
+   !       Target_X contains field values — runaway → CFL → dycore crash.
+   Nudge_Do            = 0
    Memory_Rand         = 5 !++WEC
 
    ! Read in namelist values
@@ -1433,9 +1440,14 @@ contains
        call endrun('nudging_timestep_init:: ERROR unknown Nudging_TimeScale_Opt')
      endif
 
-     ! Update the nudging tendencies
+     ! Update the nudging tendencies — branch on the Nudge_Do mode set in the
+     ! nudging_nl namelist (default 0 = standard Newtonian relaxation).
+     ! NOTE: previous build hardcoded Nudge_Do=1 here, silently overriding the
+     ! namelist and treating Target_X as pre-computed tendencies. That path is
+     ! ONLY valid when the caller pre-computes tendencies upstream (ML mode).
+     ! For nudging files containing field values (ERA5, CAMulator forecasts,
+     ! SUMO etc.), the namelist default Nudge_Do=0 is the correct path.
      !--------------------------------
-     Nudge_Do=1 !Defined as integer above [WEC]
      if(Nudge_Do==0) then
      do lchnk=begchunk,endchunk !Remove:
        ncol=phys_state(lchnk)%ncol

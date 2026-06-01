@@ -20,7 +20,8 @@ use spmd_utils,        only: masterproc, mpicom
 use cam_control_mod,   only: cam_ctrl_init, cam_ctrl_set_orbit, initial_run
 use runtime_opts,      only: read_namelist
 use time_manager,      only: timemgr_init, get_step_size, &
-                             get_nstep, is_first_step, is_first_restart_step
+                             get_nstep, is_first_step, is_first_restart_step, &
+                             get_curr_date
 
 use camsrfexch,        only: cam_out_t, cam_in_t
 use ppgrid,            only: begchunk, endchunk
@@ -54,6 +55,15 @@ type(physics_buffer_desc), pointer :: pbuf2d(:,:) => null()
 
 real(r8) :: dtime_phys         ! Time step for physics tendencies.  Set by call to
                                ! stepon_run1, then passed to the phys_run*
+
+! ---- SUMO barrier state (used only if sumo_active.flag is present in rundir) ----
+! When the sentinel file is present, cam_run4 pauses at every 6-hour boundary
+! after WSHIST so the external SUMO coordinator can advance CAMulator and write
+! a properly time-aligned nudging-target file BEFORE CAM6 reads it on the next
+! step. Absent the sentinel, this code is a single integer compare per cam_run4
+! call (zero filesystem cost) — same cesm.exe works for non-SUMO cases.
+logical, save :: sumo_check_done = .false.
+logical, save :: sumo_active     = .false.
 
 !-----------------------------------------------------------------------
 contains
@@ -410,6 +420,12 @@ subroutine cam_run4( cam_out, cam_in, rstwr, nlend, &
 
    call shr_sys_flush(iulog)
 
+   ! SUMO barrier: at 6-hour boundaries (after h1 write), pause CAM6 until the
+   ! external SUMO coordinator has written a time-aligned nudging-target file.
+   ! No-op (single integer compare) when sumo_active.flag is absent from rundir.
+   ! Skip on the final step — nothing left to nudge.
+   if (.not. nlend) call sumo_barrier_after_h1()
+
 end subroutine cam_run4
 
 !
@@ -467,6 +483,122 @@ subroutine cam_final( cam_out, cam_in )
    end if
 
 end subroutine cam_final
+
+!-----------------------------------------------------------------------
+
+subroutine sumo_barrier_after_h1()
+!-----------------------------------------------------------------------
+! SUMO barrier — pauses CAM6 at 6-hour boundaries (after WSHIST writes h1)
+! so an external coordinator can advance CAMulator and write a time-aligned
+! nudging-target file before CAM6 reads it on the next physics step.
+!
+! Activation is gated on a sentinel file 'sumo_active.flag' in the run
+! directory (CWD at runtime). The check is cached on the first call so the
+! filesystem is touched at most once per process; non-SUMO runs incur zero
+! cost beyond a single logical compare per cam_run4 invocation.
+!
+! Handshake (masterproc-only file I/O):
+!   1. CAM6 writes 'cesm_h1_ready.flag' with the current YYYYMMDD-SSSSS
+!      timestamp as its content.
+!   2. CAM6 polls for 'coordinator_done.flag'.
+!   3. Coordinator (sumo_coordinator.py) sees the ready flag, processes the
+!      just-written h1, advances CAMulator one step (producing a forecast
+!      valid at T+6h), writes a nudge file labeled T+6h with that forecast,
+!      then writes 'coordinator_done.flag'.
+!   4. CAM6 sees the done flag, deletes both flags, MPI_Barriers, returns.
+!-----------------------------------------------------------------------
+   character(len=*), parameter :: SUMO_ACTIVE_FLAG = "sumo_active.flag"
+   character(len=*), parameter :: SUMO_READY_FLAG  = "cesm_h1_ready.flag"
+   character(len=*), parameter :: SUMO_DONE_FLAG   = "coordinator_done.flag"
+   integer, parameter :: SUMO_BARRIER_INTERVAL_S = 21600   ! 6 hours
+   integer, parameter :: SUMO_POLL_SLEEP_S       = 1       ! poll cadence
+   integer, parameter :: SUMO_POLL_MAX_S         = 3600    ! 1-hour timeout
+
+   integer            :: yr, mon, day, tod, ierr, poll_s, sumo_active_int
+   logical            :: flag_exists
+   character(len=24)  :: ts_string
+
+   include 'mpif.h'
+
+   ! ---- First-call cache: check for sentinel in run dir ----
+   if (.not. sumo_check_done) then
+      if (masterproc) then
+         inquire(file=SUMO_ACTIVE_FLAG, exist=sumo_active)
+         if (sumo_active) then
+            write(iulog,*) 'CAM6: SUMO barrier mode ACTIVE (', trim(SUMO_ACTIVE_FLAG), ' found)'
+         else
+            write(iulog,*) 'CAM6: SUMO barrier mode inactive (no ', trim(SUMO_ACTIVE_FLAG), ')'
+         end if
+      end if
+      sumo_active_int = 0
+      if (sumo_active) sumo_active_int = 1
+      call mpi_bcast(sumo_active_int, 1, MPI_INTEGER, 0, mpicom, ierr)
+      sumo_active = (sumo_active_int == 1)
+      sumo_check_done = .true.
+   end if
+
+   ! ---- Fast path: non-SUMO runs leave immediately ----
+   if (.not. sumo_active) return
+
+   ! ---- Only barrier at 6-hour boundaries (when h1 was just written) ----
+   call get_curr_date(yr, mon, day, tod)
+   if (mod(tod, SUMO_BARRIER_INTERVAL_S) /= 0) return
+
+   ! ---- masterproc-only handshake ----
+   if (masterproc) then
+      write(ts_string, '(i4.4,"-",i2.2,"-",i2.2,"-",i5.5)') yr, mon, day, tod
+      write(iulog,*) 'SUMO: pausing CAM6 at ', trim(ts_string), &
+                     ' awaiting coordinator ...'
+      call shr_sys_flush(iulog)
+
+      ! Clean any stale done flag from a previous step
+      inquire(file=SUMO_DONE_FLAG, exist=flag_exists)
+      if (flag_exists) then
+         open(unit=99, file=SUMO_DONE_FLAG, status='old', iostat=ierr)
+         if (ierr == 0) close(99, status='delete')
+      end if
+
+      ! Write ready flag with the timestamp the coordinator should match
+      open(unit=99, file=SUMO_READY_FLAG, status='replace', action='write')
+      write(99,'(a)') trim(ts_string)
+      close(99)
+
+      ! Poll for coordinator_done.flag
+      poll_s = 0
+      do
+         inquire(file=SUMO_DONE_FLAG, exist=flag_exists)
+         if (flag_exists) exit
+         call execute_command_line('sleep 1', wait=.true.)
+         poll_s = poll_s + SUMO_POLL_SLEEP_S
+         if (poll_s > SUMO_POLL_MAX_S) then
+            write(iulog,*) 'SUMO: ERROR - coordinator timeout after ', poll_s, ' s'
+            call shr_sys_flush(iulog)
+            call endrun('sumo_barrier_after_h1: coordinator timeout')
+         end if
+         if (mod(poll_s, 60) == 0) then
+            write(iulog,*) 'SUMO: still waiting for coordinator (', &
+                           poll_s, '/', SUMO_POLL_MAX_S, ' s)'
+            call shr_sys_flush(iulog)
+         end if
+      end do
+
+      ! Consume done flag and ready flag
+      open(unit=99, file=SUMO_DONE_FLAG, status='old', iostat=ierr)
+      if (ierr == 0) close(99, status='delete')
+      inquire(file=SUMO_READY_FLAG, exist=flag_exists)
+      if (flag_exists) then
+         open(unit=99, file=SUMO_READY_FLAG, status='old', iostat=ierr)
+         if (ierr == 0) close(99, status='delete')
+      end if
+
+      write(iulog,*) 'SUMO: resumed at ', trim(ts_string)
+      call shr_sys_flush(iulog)
+   end if
+
+   ! ---- Sync all ranks ----
+   call mpi_barrier(mpicom, ierr)
+
+end subroutine sumo_barrier_after_h1
 
 !-----------------------------------------------------------------------
 
