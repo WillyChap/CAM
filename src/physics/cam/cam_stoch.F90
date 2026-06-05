@@ -315,6 +315,7 @@ subroutine cam_stoch_sppt_init(pbuf2d)
    use phys_grid,      only: get_ncols_p
    use mpishorthand
    use spmd_utils,     only:  masterproc
+   use cam_abortutils, only: endrun
    type(physics_buffer_desc), pointer       :: pbuf2d(:,:)
    type(physics_buffer_desc), pointer :: phys_buffer_chunk(:)
    integer, pointer :: iseedarr_sppt(:)  ! (pcols,lchunk)
@@ -332,6 +333,15 @@ subroutine cam_stoch_sppt_init(pbuf2d)
 
     call addfld ('RSTOCH_SPPT',   horiz_only  ,  'A', 'none', 'random field')
     call addfld ('ISEEDARR_SPPT',   horiz_only  ,  'A', 'none', 'iseedarr_sppt')
+
+    ! SPHEREPACK calls (shsesi, shses) have been removed from this CESM fork to
+    ! make the build portable to machines without spherepack (e.g. UiB Olivia).
+    ! SPPT cannot produce a real spectral pattern without them -- hard-fail at
+    ! init if a user enables it. SUMO/CAMulator does not use SPPT.
+    if (cam_stoch_sppt == 1) then
+       call endrun('cam_stoch_sppt_init: SPPT requires SPHEREPACK which has been ' // &
+                   'removed from this CESM fork. Set cam_stoch_sppt=0 in user_nl_cam.')
+    end if
 
    ! Get size of global grid (only valid for rectangular lat/lon grids)
      nlon = get_dyn_grid_parm('plon')
@@ -359,15 +369,11 @@ subroutine cam_stoch_sppt_init(pbuf2d)
      ALLOCATE(work(lwork))
      ALLOCATE(dwork(ldwork))
      ierror=99
-     call shsesi(nlat,nlon,wshses,lshses,work,lwork,dwork,ldwork,ierror) !for lat-lon grid
-     !  if(ierror .eq. 0) write (*,'(''no error in the specification '')')
-     if(ierror .ne. 0) then
-       if(ierror .eq. 1) write (*,'(''error in the specification of nlat'')')
-       if(ierror .eq. 2) write (*,'(''error in the specification of nlon'')')
-       if(ierror .eq. 3) write (*,'(''error in the specification of lshses'')')
-       if(ierror .eq. 4) write (*,'(''error in the specification of lwork  '')')
-       if(ierror .eq. 5) write (*,'(''error in the specification of ldwork  '')')
-     endif
+     ! SPHEREPACK removed from this CESM fork: shsesi call deleted, wshses zeroed.
+     ! This subroutine is unreachable when cam_stoch_sppt=0 below the endrun above,
+     ! so the zeroed weights are never used.
+     wshses = 0.0
+     ierror = 0
      DEALLOCATE(work)
 
      nmax=nlat
@@ -668,7 +674,12 @@ subroutine generate_randomfield(pbuf,ncol,lchnk)
       ierror=99
       lwork=(1+1)*nlat*nlon
       ALLOCATE(work(lwork))
-      call shses(nlat,nlon,0,1,RGP,NLAT,NLON,RA,RB,MMAX+1,NMAX+1,wshses,lshses,work,lwork,ierror)!lon/lat grid
+      ! SPHEREPACK removed from this CESM fork: shses call deleted, RGP zeroed.
+      ! sh2gp is only invoked from generate_spatio_temporal_randomfield, which is
+      ! only called when cam_stoch_sppt=1 -- and cam_stoch_sppt_init hard-fails in
+      ! that case (see endrun above), so this code path is unreachable at runtime.
+      RGP = 0.0
+      ierror = 0
       if(ierror .ne. 0) write(*,94) ierror
       94 format('error in shses=  ',i5)
       DEALLOCATE (work)
